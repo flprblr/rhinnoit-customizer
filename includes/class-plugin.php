@@ -16,7 +16,15 @@ use RhinnoIT\Customizer\Frontend\Commune_Select;
 use RhinnoIT\Customizer\Frontend\Coupon_Split;
 use RhinnoIT\Customizer\Frontend\Express_Checkout;
 use RhinnoIT\Customizer\Frontend\Fintoc_Session_Expiry;
+use RhinnoIT\Customizer\Frontend\Inventory_Links;
+use RhinnoIT\Customizer\Frontend\Pickup_Stores;
+use RhinnoIT\Customizer\Frontend\Quick_View_Store;
+use RhinnoIT\Customizer\Frontend\Size_Stores;
+use RhinnoIT\Customizer\Frontend\Store_Choice;
+use RhinnoIT\Customizer\Frontend\Store_Stock_Hold;
 use RhinnoIT\Customizer\Frontend\Unpaid_Orders;
+use RhinnoIT\Customizer\Frontend\Widget_Sale_Price;
+use RhinnoIT\Customizer\Frontend\Widget_Thumbnail;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -54,9 +62,9 @@ final class Plugin {
 	/**
 	 * Declares compatibility with the WooCommerce features.
 	 *
-	 * Blocks stay declared compatible although Checkout_Focus and
-	 * Commune_Select act on the classic (shortcode) checkout only: on the block
-	 * checkout they do nothing, and they break nothing. Set
+	 * Blocks stay declared compatible although Checkout_Focus, Commune_Select
+	 * and Store_Stock_Hold act on the classic (shortcode) checkout only: on the
+	 * block checkout they do nothing, and they break nothing. Set
 	 * `cart_checkout_blocks` to false only for a service that would break the
 	 * block checkout.
 	 *
@@ -89,11 +97,22 @@ final class Plugin {
 			// A service whose job needs WooCommerce registers here and nowhere
 			// else, and lives in includes/frontend/. The WordPress half above
 			// touches WooCommerce only behind a guard.
+			( new Widget_Thumbnail() )->register();
+			( new Widget_Sale_Price() )->register();
 			( new Express_Checkout() )->register();
 			( new Checkout_Focus() )->register();
 			( new Commune_Select() )->register();
 			( new Cart_Sale_Price() )->register();
 			( new Coupon_Split() )->register();
+			// The WeLaunch scripts go on WeLaunch's own handle: the three at 99
+			// print in the order they register here, then Store_Choice's at 100,
+			// which ticks from the radios Size_Stores' script sets.
+			( new Inventory_Links() )->register();
+			( new Quick_View_Store() )->register();
+			( new Size_Stores() )->register();
+			( new Store_Choice() )->register();
+			( new Pickup_Stores() )->register();
+			( new Store_Stock_Hold() )->register();
 			( new Unpaid_Orders() )->register();
 			( new Fintoc_Session_Expiry() )->register();
 		} elseif ( self::woocommerce_is_active() ) {

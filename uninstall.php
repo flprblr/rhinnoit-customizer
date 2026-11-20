@@ -22,6 +22,15 @@ $rcus_options = array(
 	'rcus_checkout_commune_select',
 	'rcus_unpaid_orders',
 	'rcus_fintoc_session_expiry',
+	'rcus_widget_thumb_srcset',
+	'rcus_widget_sale_price',
+	'rcus_inventory_quick_view',
+	'rcus_inventory_links',
+	'rcus_store_choice',
+	'rcus_store_choice_delivery',
+	'rcus_pickup_stores_in_stock',
+	'rcus_size_stores_at_once',
+	'rcus_store_stock_hold',
 	// A switch retired by a split, or removed outright, stays listed here: the
 	// update keeps its row so a rollback still finds the choice made there.
 	// Settings::retired_option_ids() names them, and a test holds this to it.
@@ -43,3 +52,11 @@ delete_transient( 'rcus_broken_build_admin' );
  */
 delete_transient( 'rcus_coupon_split_filtered' );
 delete_transient( 'rcus_coupon_split_table' );
+
+/*
+ * Left on purpose: the order meta _rwpo_store_units_taken, which
+ * Store_Stock_Hold writes on a failed order whose store units WeLaunch kept.
+ * It is order data and must survive a reinstall: without it, those orders
+ * would count the same units twice. The rwpo_cart_store cookie lives only in
+ * browsers.
+ */

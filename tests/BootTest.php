@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Settings_Page;
 use RhinnoIT\Customizer\Frontend\Commune_Select;
+use RhinnoIT\Customizer\Frontend\Widget_Sale_Price;
 use RhinnoIT\Customizer\Plugin;
 
 #[CoversClass( Plugin::class )]
@@ -47,6 +48,7 @@ final class BootTest extends TestCase {
 				'admin_menu:register_pages',
 				'admin_post_' . Settings_Page::SAVE_ACTION . ':save',
 				'plugin_action_links_' . RCUS_BASENAME . ':add_settings_link',
+				'porto_lazy_load_images:add_srcset',
 				'woocommerce_add_to_cart_redirect:redirect_to_checkout',
 				'template_redirect:drop_the_prompts',
 				'woocommerce_cart_item_subtotal:strike_line_subtotal',
@@ -58,9 +60,11 @@ final class BootTest extends TestCase {
 			$this->assertContains( $callback, WP_Stub::$callbacks );
 		}
 
-		// add_script is a name more than one service can use, so the class
-		// says which one hooked it.
+		// add_script and add_style are names more than one service uses, so
+		// the class says which one hooked it. The WeLaunch services boot in
+		// BootWithWeLaunchTest, since the shared process has no WeLaunch.
 		$this->assertContains( array( 'wp_enqueue_scripts', Commune_Select::class, 'add_script', 1 ), WP_Stub::$registered );
+		$this->assertContains( array( 'wp_enqueue_scripts', Widget_Sale_Price::class, 'add_style', 1 ), WP_Stub::$registered );
 
 		$this->assertNotContains( 'admin_notices', WP_Stub::$hooks, 'Nothing is wrong, so nothing is announced.' );
 	}

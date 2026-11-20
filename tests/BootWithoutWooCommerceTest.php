@@ -72,6 +72,9 @@ final class BootWithoutWooCommerceTest extends TestCase {
 		$this->assertContains( 'rcus_enabled', $ids );
 		$this->assertNotContains( 'rcus_cart_sale_price', $ids );
 		$this->assertNotContains( 'rcus_woocommerce', $ids, 'The section heading goes with its fields.' );
+		$this->assertNotContains( 'rcus_porto', $ids, 'Porto\'s section acts on WooCommerce markup.' );
+		$this->assertNotContains( 'rcus_widget_thumb_srcset', $ids );
+		$this->assertNotContains( 'rcus_multi_inventory', $ids );
 	}
 
 	#[RunInSeparateProcess]

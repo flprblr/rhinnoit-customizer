@@ -27,6 +27,18 @@ final class Settings {
 	const string REQUIRES_WOOCOMMERCE = 'woocommerce';
 
 	/**
+	 * Marks the rows of the Porto section: WooCommerce features on Porto's own markup.
+	 *
+	 * Also a need of the one WeLaunch switch that acts on Porto's quick view.
+	 */
+	const string REQUIRES_PORTO = 'porto';
+
+	/**
+	 * Marks the rows of the WeLaunch Multi Inventory section.
+	 */
+	const string REQUIRES_MULTI_INVENTORY = 'multi_inventory';
+
+	/**
 	 * A switch that needs Fintoc for WooCommerce: it hooks Fintoc's own filter.
 	 */
 	const string NEEDS_FINTOC = 'fintoc';
@@ -49,11 +61,14 @@ final class Settings {
 	/**
 	 * Field definition.
 	 *
-	 * The master switch alone in an untitled card, then WooCommerce. There is
-	 * no WordPress card: nothing this plugin does works without WooCommerce.
-	 * Every row of the WooCommerce section, its title and sectionend included,
-	 * carries 'requires' => self::REQUIRES_WOOCOMMERCE, and available_fields()
-	 * drops them on a site without a supported WooCommerce.
+	 * The master switch alone in an untitled card, then WooCommerce; Porto, for
+	 * features on the theme's own WooCommerce markup; and WeLaunch Multi
+	 * Inventory. There is no WordPress card: nothing this plugin does works
+	 * without WooCommerce. Every row of the last three, its title and
+	 * sectionend included, carries 'requires' with its section's mark, and
+	 * available_fields() drops a section whole on a site without what it
+	 * needs. A feature that works on Porto's or WeLaunch's own output goes in
+	 * their section, not in WooCommerce's.
 	 *
 	 * An option that can only act with something its section does not promise
 	 * - a plugin, the host, the kind of theme, a core version - also carries
@@ -192,17 +207,125 @@ final class Settings {
 				'is_option' => false,
 				'requires'  => self::REQUIRES_WOOCOMMERCE,
 			),
+			array(
+				'id'        => self::OPTION_PREFIX . 'porto',
+				'type'      => 'title',
+				'title'     => __( 'Porto', 'rhinnoit-customizer' ),
+				'is_option' => false,
+				'requires'  => self::REQUIRES_PORTO,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'widget_thumb_srcset',
+				'type'     => 'checkbox',
+				'group'    => __( 'Product widgets', 'rhinnoit-customizer' ),
+				'title'    => __( 'Show sharp thumbnails', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Thumbnails in widgets load at a higher resolution and stop looking blurry.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_PORTO,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'widget_sale_price',
+				'type'     => 'checkbox',
+				'group'    => __( 'Product widgets', 'rhinnoit-customizer' ),
+				'title'    => __( 'Match the sale price color', 'rhinnoit-customizer' ),
+				'desc'     => __( 'The sale price in widgets uses the same color as on shop and category pages.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_PORTO,
+			),
+			array(
+				'id'        => self::OPTION_PREFIX . 'porto',
+				'type'      => 'sectionend',
+				'is_option' => false,
+				'requires'  => self::REQUIRES_PORTO,
+			),
+			array(
+				'id'        => self::OPTION_PREFIX . 'multi_inventory',
+				'type'      => 'title',
+				'title'     => __( 'WeLaunch Multi Inventory', 'rhinnoit-customizer' ),
+				'is_option' => false,
+				'requires'  => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'inventory_quick_view',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Keep the quick view\'s store choice', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Adding from the quick view keeps the store the shopper picked.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+				'needs'    => array( self::REQUIRES_PORTO ),
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'inventory_links',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Remove the store from links', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Links do not carry the last store used, so pages can keep loading from the cache.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'store_choice',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Let the shopper choose', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Pickup stores never come ticked, and adding to the cart needs home delivery or a store ticked.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'store_choice_delivery',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Tick home delivery when in stock', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Home delivery comes ticked when it has the size picked and the cart is empty or for home delivery. Requires "Let the shopper choose".', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'pickup_stores_in_stock',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Hide stores without the size', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Pickup stores show only if they have the size picked, and home delivery always does. Check the product page.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'size_stores_at_once',
+				'type'     => 'checkbox',
+				'group'    => __( 'Store picked', 'rhinnoit-customizer' ),
+				'title'    => __( 'Show each size\'s stores instantly', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Shows which stores have the size as soon as it is picked, without waiting.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'store_stock_hold',
+				'type'     => 'checkbox',
+				'group'    => __( 'Stock', 'rhinnoit-customizer' ),
+				'title'    => __( 'Hold each store\'s stock', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Keeps two shoppers from paying for a store\'s last unit at the same time.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_MULTI_INVENTORY,
+			),
+			array(
+				'id'        => self::OPTION_PREFIX . 'multi_inventory',
+				'type'      => 'sectionend',
+				'is_option' => false,
+				'requires'  => self::REQUIRES_MULTI_INVENTORY,
+			),
 		);
 	}
 
 	/**
 	 * The fields this site can use: fields() minus what it lacks.
 	 *
-	 * The form draws and saves this list, so on a site without WooCommerce the
-	 * WooCommerce section is neither shown nor writable, and neither is an
-	 * option whose 'needs' the site does not meet - both keep whatever value
-	 * they had, ready for the day what they need is installed. See
-	 * fields_for_marks() for the rules.
+	 * The form draws and saves this list, so on a site without WooCommerce,
+	 * Porto or WeLaunch Multi Inventory that section is neither shown nor
+	 * writable, and neither is an option whose 'needs' the site does not meet
+	 * - both keep whatever value they had, ready for the day what they need is
+	 * installed. See fields_for_marks() for the rules.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -308,9 +431,11 @@ final class Settings {
 	 * so a field is hidden exactly where it would do nothing.
 	 * The empty mark is the one a field without 'requires' carries.
 	 *
-	 * Each 'needs' mark is a NEEDS_* constant answered here, in the same change
-	 * as the first field that names one: a mark this list does not answer
-	 * hides its field on every site.
+	 * Each 'needs' mark is a NEEDS_* constant, or a section mark such as
+	 * REQUIRES_PORTO, answered here in the same change as the first field
+	 * that names one: a mark this list does not answer hides its field on
+	 * every site. Porto's and WeLaunch's sections are WooCommerce features, so
+	 * they need WooCommerce too.
 	 *
 	 * @return array<string, bool>
 	 */
@@ -318,11 +443,13 @@ final class Settings {
 		$woocommerce = Plugin::woocommerce_is_supported();
 
 		return array(
-			''                         => true,
-			self::REQUIRES_WOOCOMMERCE => $woocommerce,
+			''                             => true,
+			self::REQUIRES_WOOCOMMERCE     => $woocommerce,
+			self::REQUIRES_PORTO           => $woocommerce && 'porto' === get_template(),
+			self::REQUIRES_MULTI_INVENTORY => $woocommerce && function_exists( 'welaunch_woocommerce_multi_inventory_run' ),
 			// Defined when Fintoc's main file loads; its filter fires only from its gateway.
-			self::NEEDS_FINTOC         => defined( 'FINTOC_WC_VERSION' ),
-			self::NEEDS_COUPON_ITEMS   => $woocommerce && Coupon_Split::can_split(),
+			self::NEEDS_FINTOC             => defined( 'FINTOC_WC_VERSION' ),
+			self::NEEDS_COUPON_ITEMS       => $woocommerce && Coupon_Split::can_split(),
 		);
 	}
 

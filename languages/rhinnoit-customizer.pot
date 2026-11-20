@@ -137,10 +137,136 @@ msgstr ""
 msgid "The time to pay with Fintoc ends with the stock hold, instead of lasting 24 hours."
 msgstr ""
 
+#: includes/class-settings.php
+msgid "Porto"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Product widgets"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Show sharp thumbnails"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Thumbnails in widgets load at a higher resolution and stop looking blurry."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Match the sale price color"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "The sale price in widgets uses the same color as on shop and category pages."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "WeLaunch Multi Inventory"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Store picked"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Keep the quick view's store choice"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Adding from the quick view keeps the store the shopper picked."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Remove the store from links"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Links do not carry the last store used, so pages can keep loading from the cache."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Let the shopper choose"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Pickup stores never come ticked, and adding to the cart needs home delivery or a store ticked."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Tick home delivery when in stock"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Home delivery comes ticked when it has the size picked and the cart is empty or for home delivery. Requires \"Let the shopper choose\"."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Hide stores without the size"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Pickup stores show only if they have the size picked, and home delivery always does. Check the product page."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Show each size's stores instantly"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Shows which stores have the size as soon as it is picked, without waiting."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Stock"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Hold each store's stock"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Keeps two shoppers from paying for a store's last unit at the same time."
+msgstr ""
+
 #: includes/frontend/class-commune-select.php
 msgid "Choose a commune…"
 msgstr ""
 
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
+msgstr ""
+
+#: includes/frontend/class-store-choice.php
+msgid "Choose home delivery or a store to pick it up."
+msgstr ""
+
+#. translators: %s: store name.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%s does not take online orders. Choose home delivery or another store."
+msgstr ""
+
+#. translators: 1: product name, 2: store name, 3: units the store has.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s. Choose another location or fewer units."
+msgstr ""
+
+#. translators: %s: product name.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%s is not available online."
+msgstr ""
+
+#. translators: 1: product name, 2: store name, 3: units the store has.
+#: includes/frontend/class-store-stock-hold.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s. Place a new order and choose another location."
+msgstr ""
+
+#. translators: 1: product name, 2: store name, 3: units the store can still sell.
+#: includes/frontend/class-store-stock-hold.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s while other customers complete their payment. Choose another location or fewer units, or try again in a few minutes."
 msgstr ""

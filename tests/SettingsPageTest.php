@@ -120,16 +120,21 @@ final class SettingsPageTest extends TestCase {
 	/**
 	 * The form shows one card per thing the shop runs, in order.
 	 *
+	 * The shared process runs Porto and no WeLaunch Multi Inventory.
+	 *
 	 * @return void
 	 */
 	public function test_a_shop_sees_a_card_per_domain(): void {
 		$html = $this->form();
 
 		$this->assertStringContainsString( '<h2 class="rcus-card__title">WooCommerce</h2>', $html );
+		$this->assertStringContainsString( '<h2 class="rcus-card__title">Porto</h2>', $html );
+		$this->assertStringNotContainsString( '>WeLaunch Multi Inventory</h2>', $html, 'Not installed here.' );
 		$this->assertStringNotContainsString( '>WordPress</h2>', $html, 'Nothing this plugin does works without WooCommerce.' );
 		$this->assertLessThan( strpos( $html, '>WooCommerce</h2>' ), strpos( $html, 'for="rcus_enabled"' ), 'The master switch above every card.' );
-		$this->assertSame( 2, substr_count( $html, '<section class="rcus-card">' ), 'The master switch, then one card per domain.' );
-		$this->assertSame( 1, substr_count( $html, '<h2' ), 'The master switch has no heading of its own.' );
+		$this->assertLessThan( strpos( $html, '>Porto</h2>' ), strpos( $html, '>WooCommerce</h2>' ), 'The platform before the theme.' );
+		$this->assertSame( 3, substr_count( $html, '<section class="rcus-card">' ), 'The master switch, then one card per domain.' );
+		$this->assertSame( 2, substr_count( $html, '<h2' ), 'The master switch has no heading of its own.' );
 		$this->assertSame( substr_count( $html, '<section' ), substr_count( $html, '</section>' ), 'Every card closes what it opened.' );
 		$this->assertSame( substr_count( $html, '<div' ), substr_count( $html, '</div>' ), 'Every row closes what it opened.' );
 	}
@@ -147,7 +152,7 @@ final class SettingsPageTest extends TestCase {
 		$html       = $this->form();
 		$checkboxes = substr_count( $html, 'type="checkbox"' );
 
-		$this->assertSame( 9, $checkboxes, 'One switch per feature that can apply, plus the master switch: not the Fintoc one on a site without it.' );
+		$this->assertSame( 11, $checkboxes, 'One switch per feature that can apply, plus the master switch: not WeLaunch\'s seven, nor the Fintoc one on a site without them.' );
 		$this->assertSame( $checkboxes, substr_count( $html, 'type="checkbox" role="switch" class="rcus-switch"' ) );
 		$this->assertStringContainsString( '<label class="rcus-row__label" for="rcus_enabled">Enable</label>', $html );
 		$this->assertStringContainsString( 'aria-describedby="rcus_enabled-desc"', $html );
@@ -165,7 +170,8 @@ final class SettingsPageTest extends TestCase {
 		$this->assertSame( 1, substr_count( $html, '<h3 class="rcus-card__group">Cart and checkout</h3>' ) );
 		$this->assertLessThan( strpos( $html, 'for="rcus_express_checkout"' ), strpos( $html, '>Cart and checkout</h3>' ) );
 		$this->assertGreaterThan( strpos( $html, 'for="rcus_checkout_commune_select"' ), strpos( $html, '>Orders</h3>' ) );
-		$this->assertSame( 2, substr_count( $html, '<h3 class="rcus-card__group">' ), 'Cart and checkout, then Orders, each once.' );
+		$this->assertLessThan( strpos( $html, 'for="rcus_widget_thumb_srcset"' ), strpos( $html, '>Product widgets</h3>' ) );
+		$this->assertSame( 3, substr_count( $html, '<h3 class="rcus-card__group">' ), 'Cart and checkout, then Orders, then Porto\'s Product widgets, each once.' );
 	}
 
 	/**

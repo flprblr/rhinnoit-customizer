@@ -74,6 +74,15 @@ final class PluginTest extends TestCase {
 				'rcus_checkout_commune_select' => 'yes',
 				'rcus_unpaid_orders'           => 'yes',
 				'rcus_fintoc_session_expiry'   => 'yes',
+				'rcus_widget_thumb_srcset'     => 'yes',
+				'rcus_widget_sale_price'       => 'yes',
+				'rcus_inventory_quick_view'    => 'yes',
+				'rcus_inventory_links'         => 'yes',
+				'rcus_store_choice'            => 'yes',
+				'rcus_store_choice_delivery'   => 'yes',
+				'rcus_pickup_stores_in_stock'  => 'yes',
+				'rcus_size_stores_at_once'     => 'yes',
+				'rcus_store_stock_hold'        => 'yes',
 			),
 			Settings::defaults()
 		);
@@ -108,7 +117,9 @@ final class PluginTest extends TestCase {
 		// needs; a WordPress row with one disappears from plain sites. A plugin
 		// that adds a conditional card adds its title id and mark here.
 		$marks   = array(
-			'rcus_woocommerce' => Settings::REQUIRES_WOOCOMMERCE,
+			'rcus_woocommerce'     => Settings::REQUIRES_WOOCOMMERCE,
+			'rcus_porto'           => Settings::REQUIRES_PORTO,
+			'rcus_multi_inventory' => Settings::REQUIRES_MULTI_INVENTORY,
 		);
 		$current = '';
 		$seen    = array();
@@ -130,7 +141,7 @@ final class PluginTest extends TestCase {
 			}
 		}
 
-		$this->assertSame( array_keys( $marks ), $seen, 'Every conditional card is there, in this order.' );
+		$this->assertSame( array_keys( $marks ), $seen, 'WooCommerce, then Porto, then WeLaunch Multi Inventory.' );
 	}
 
 	public function test_activation_seeds_defaults_without_overwriting_existing_values(): void {

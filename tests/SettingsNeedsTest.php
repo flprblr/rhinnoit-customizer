@@ -12,9 +12,11 @@
  * too: its field hidden where the mark is missing, drawn where it is there,
  * and its stored value kept either way.
  *
- * The shared process is a shop without Fintoc, on a WooCommerce whose
- * WC_Discounts hands a coupon's items over. The cases that need Fintoc or an
- * older WooCommerce run in their own process: SettingsWithFintocTest and
+ * The shared process is a Porto shop without Fintoc and without WeLaunch
+ * Multi Inventory, on a WooCommerce whose WC_Discounts hands a coupon's items
+ * over. The cases that need Fintoc, WeLaunch, no Porto or an older
+ * WooCommerce run in their own process: SettingsWithFintocTest,
+ * BootWithWeLaunchTest, SettingsWithoutPortoTest and
  * CouponSplitBeforeItemsFilterTest.
  *
  * @package RhinnoIT\Customizer
@@ -52,19 +54,23 @@ final class SettingsNeedsTest extends TestCase {
 	}
 
 	/**
-	 * Without Fintoc its switch is not offered; the coupon split, which this WooCommerce feeds, is.
+	 * Without Fintoc or WeLaunch their switches are not offered; the coupon split, which this WooCommerce feeds, and Porto's are.
 	 *
 	 * @return void
 	 */
 	public function test_a_switch_that_cannot_act_here_is_not_on_the_screen(): void {
 		$this->assertFalse( defined( 'FINTOC_WC_VERSION' ), 'The process has Fintoc, or this case means nothing.' );
+		$this->assertFalse( function_exists( 'welaunch_woocommerce_multi_inventory_run' ), 'The process has WeLaunch, or this case means nothing.' );
 		$this->assertTrue( Coupon_Split::can_split(), 'The process cannot split coupons, or this case means nothing.' );
+		$this->assertSame( 'porto', get_template(), 'The process runs another theme, or this case means nothing.' );
 
 		$ids = self::drawn();
 
-		$this->assertNotContains( 'rcus_fintoc_session_expiry', $ids, 'rcus_fintoc_session_expiry does nothing on this site.' );
+		foreach ( array( 'rcus_fintoc_session_expiry', 'rcus_multi_inventory', 'rcus_inventory_quick_view', 'rcus_store_stock_hold' ) as $id ) {
+			$this->assertNotContains( $id, $ids, sprintf( '%s does nothing on this site.', $id ) );
+		}
 
-		foreach ( array( 'rcus_woocommerce', 'rcus_cart_coupon_split', 'rcus_unpaid_orders' ) as $id ) {
+		foreach ( array( 'rcus_woocommerce', 'rcus_cart_coupon_split', 'rcus_unpaid_orders', 'rcus_porto', 'rcus_widget_sale_price' ) as $id ) {
 			$this->assertContains( $id, $ids, sprintf( '%s can act here.', $id ) );
 		}
 	}

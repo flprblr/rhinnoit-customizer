@@ -142,6 +142,98 @@ msgstr "Evitar pagos tardíos con Fintoc"
 msgid "The time to pay with Fintoc ends with the stock hold, instead of lasting 24 hours."
 msgstr "El plazo para pagar con Fintoc termina con la reserva de stock, en vez de durar 24 horas."
 
+#: includes/class-settings.php
+msgid "Porto"
+msgstr "Porto"
+
+#: includes/class-settings.php
+msgid "Product widgets"
+msgstr "Widgets de productos"
+
+#: includes/class-settings.php
+msgid "Show sharp thumbnails"
+msgstr "Mostrar miniaturas nítidas"
+
+#: includes/class-settings.php
+msgid "Thumbnails in widgets load at a higher resolution and stop looking blurry."
+msgstr "Las miniaturas de los widgets cargan en mayor resolución y dejan de verse borrosas."
+
+#: includes/class-settings.php
+msgid "Match the sale price color"
+msgstr "Igualar el color del precio de oferta"
+
+#: includes/class-settings.php
+msgid "The sale price in widgets uses the same color as on shop and category pages."
+msgstr "El precio de oferta de los widgets usa el mismo color que en la tienda y las categorías."
+
+#: includes/class-settings.php
+msgid "WeLaunch Multi Inventory"
+msgstr "WeLaunch Multi Inventory"
+
+#: includes/class-settings.php
+msgid "Store picked"
+msgstr "Tienda elegida"
+
+#: includes/class-settings.php
+msgid "Keep the quick view's store choice"
+msgstr "Mantener la tienda elegida en la vista rápida"
+
+#: includes/class-settings.php
+msgid "Adding from the quick view keeps the store the shopper picked."
+msgstr "Al agregar desde la vista rápida, se mantiene la tienda que eligió el cliente."
+
+#: includes/class-settings.php
+msgid "Remove the store from links"
+msgstr "Quitar la tienda de los enlaces"
+
+#: includes/class-settings.php
+msgid "Links do not carry the last store used, so pages can keep loading from the cache."
+msgstr "Los enlaces no llevan la última tienda usada, así las páginas pueden seguir cargando desde la caché."
+
+#: includes/class-settings.php
+msgid "Let the shopper choose"
+msgstr "Dejar que el cliente elija"
+
+#: includes/class-settings.php
+msgid "Pickup stores never come ticked, and adding to the cart needs home delivery or a store ticked."
+msgstr "Las tiendas de retiro nunca vienen marcadas, y para agregar al carrito hay que marcar despacho a domicilio o una tienda."
+
+#: includes/class-settings.php
+msgid "Tick home delivery when in stock"
+msgstr "Marcar despacho a domicilio si hay stock"
+
+#: includes/class-settings.php
+msgid "Home delivery comes ticked when it has the size picked and the cart is empty or for home delivery. Requires \"Let the shopper choose\"."
+msgstr "El despacho a domicilio viene marcado si tiene la talla elegida y el carrito está vacío o es para despacho. Requiere «Dejar que el cliente elija»."
+
+#: includes/class-settings.php
+msgid "Hide stores without the size"
+msgstr "Ocultar las tiendas sin la talla"
+
+#: includes/class-settings.php
+msgid "Pickup stores show only if they have the size picked, and home delivery always does. Check the product page."
+msgstr "Solo se ven las tiendas de retiro con la talla elegida, y el despacho a domicilio siempre. Revisa la página de producto."
+
+#: includes/class-settings.php
+msgid "Show each size's stores instantly"
+msgstr "Mostrar al instante las tiendas de cada talla"
+
+#: includes/class-settings.php
+msgid "Shows which stores have the size as soon as it is picked, without waiting."
+msgstr "Muestra qué tiendas tienen la talla al elegirla, sin esperar."
+
+#: includes/class-settings.php
+msgid "Stock"
+msgstr "Stock"
+
+#: includes/class-settings.php
+msgid "Hold each store's stock"
+msgstr "Reservar el stock de cada tienda"
+
+#: includes/class-settings.php
+msgid "Keeps two shoppers from paying for a store's last unit at the same time."
+msgstr "Evita que dos clientes paguen a la vez la última unidad de una tienda."
+
 #: includes/frontend/class-commune-select.php
 msgid "Choose a commune…"
 msgstr "Elige una comuna…"
@@ -149,3 +241,37 @@ msgstr "Elige una comuna…"
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
 msgstr "Elige primero la región"
+
+#: includes/frontend/class-store-choice.php
+msgid "Choose home delivery or a store to pick it up."
+msgstr "Elige despacho a domicilio o una tienda para retirar."
+
+#. translators: %s: store name.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%s does not take online orders. Choose home delivery or another store."
+msgstr "%s no recibe pedidos en línea. Elige despacho a domicilio u otra tienda."
+
+#. translators: 1: product name, 2: store name, 3: units the store has.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s. Choose another location or fewer units."
+msgstr "%1$s: quedan %3$d en %2$s. Elige otra ubicación o menos unidades."
+
+#. translators: %s: product name.
+#: includes/frontend/class-store-choice.php
+#, php-format
+msgid "%s is not available online."
+msgstr "%s no está disponible en línea."
+
+#. translators: 1: product name, 2: store name, 3: units the store has.
+#: includes/frontend/class-store-stock-hold.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s. Place a new order and choose another location."
+msgstr "%1$s: quedan %3$d en %2$s. Haz un nuevo pedido y elige otra ubicación."
+
+#. translators: 1: product name, 2: store name, 3: units the store can still sell.
+#: includes/frontend/class-store-stock-hold.php
+#, php-format
+msgid "%1$s: %3$d left at %2$s while other customers complete their payment. Choose another location or fewer units, or try again in a few minutes."
+msgstr "%1$s: quedan %3$d en %2$s mientras otros clientes completan su pago. Elige otra ubicación o menos unidades, o inténtalo de nuevo en unos minutos."
