@@ -203,4 +203,54 @@ final class PluginTest extends TestCase {
 
 		$this->assertFalse( Settings::is_enabled() );
 	}
+
+	public function test_the_settings_of_wp_optimizer_are_carried_over(): void {
+		// A shop that ran RHINNO IT - WP Optimizer, whose shop half moved here.
+		// A new slug is a new plugin to WordPress, so without the migration
+		// every site would start over from the defaults.
+		WP_Stub::$options = array(
+			'rwpo_cart_sale_price'  => 'no',
+			'rwpo_express_checkout' => 'yes',
+			'rwpo_enabled'          => 'no',
+			'rwpo_srcset_prune'     => 'no',
+		);
+
+		Install::activate();
+
+		$this->assertSame( 'no', WP_Stub::$options['rcus_cart_sale_price'], 'A correction switched off there stays off here.' );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_express_checkout'], 'A journey change switched on there stays on here.' );
+		$this->assertSame( 'no', WP_Stub::$options['rcus_enabled'], 'A shop that had switched WP Optimizer off starts with this one off.' );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_cart_coupon_split'], 'An option WP Optimizer never stored gets its default.' );
+		$this->assertArrayNotHasKey( 'rcus_srcset_prune', WP_Stub::$options, 'Only this plugin\'s own options come over: that switch is the Optimizer\'s.' );
+	}
+
+	public function test_the_migration_never_overwrites_a_value_set_here(): void {
+		WP_Stub::$options = array(
+			'rwpo_cart_sale_price' => 'no',
+			'rcus_cart_sale_price' => 'yes',
+		);
+
+		Install::activate();
+
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_cart_sale_price'], 'An older value from the old plugin must not win.' );
+	}
+
+	public function test_the_migration_copies_and_never_deletes(): void {
+		WP_Stub::$options = array( 'rwpo_cart_sale_price' => 'no' );
+
+		Install::activate();
+
+		// The old plugin may still be active; its own uninstaller owns these.
+		$this->assertSame( 'no', WP_Stub::$options['rwpo_cart_sale_price'] );
+	}
+
+	public function test_a_site_seeded_from_its_dashboard_gets_the_migration_too(): void {
+		// The other sites of a network activation are seeded by check_version()
+		// the first time their dashboard loads, so the copy has to come with it.
+		WP_Stub::$options = array( 'rwpo_cart_sale_price' => 'no' );
+
+		Install::check_version();
+
+		$this->assertSame( 'no', WP_Stub::$options['rcus_cart_sale_price'] );
+	}
 }

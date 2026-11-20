@@ -33,6 +33,11 @@ final class BootTest extends TestCase {
 	 * @return void
 	 */
 	public function test_a_supported_woocommerce_gets_every_service(): void {
+		// The guard in boot() asks for WP Optimizer's constant, which this
+		// process never defines. Renamed to this plugin's own, it would hold
+		// here as on every shop, and boot nothing but a notice.
+		$this->assertFalse( defined( Plugin::LEGACY_CONSTANT ), 'WP Optimizer is not active here: a guard that holds anyway would keep the plugin off on every shop.' );
+
 		foreach ( array( 'express_checkout', 'checkout_coupon_prompt', 'unpaid_orders', 'cart_sale_price' ) as $switch ) {
 			WP_Stub::$options[ 'rcus_' . $switch ] = 'yes';
 		}

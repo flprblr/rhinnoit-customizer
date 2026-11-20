@@ -39,6 +39,16 @@ final class Plugin {
 	const string MIN_WC_VERSION = '8.0';
 
 	/**
+	 * Constant that RHINNO IT - WP Optimizer, the plugin this one replaces, defines while it is active.
+	 *
+	 * Written out rather than derived, like Install::LEGACY_PREFIX: it names
+	 * what existed before, so it must NOT follow a rename. Renamed to this
+	 * plugin's own version constant, which is always defined, the guard in
+	 * boot() would hold on every request and the plugin would never run.
+	 */
+	const string LEGACY_CONSTANT = 'RWPO_VERSION';
+
+	/**
 	 * Shared instance.
 	 *
 	 * @var Plugin|null
@@ -51,9 +61,24 @@ final class Plugin {
 	 * Returns nothing on purpose: it runs as an action callback, and WordPress
 	 * discards whatever an action returns.
 	 *
+	 * While WP Optimizer is still active it boots nothing but a notice: that
+	 * plugin runs the same features under its own switches, so with both
+	 * booted the shop would get each change twice. The activation copy of its
+	 * settings is not booted from here, so it still runs. The question is
+	 * asked here, on plugins_loaded, and never at file scope: WordPress loads
+	 * the active plugins in the order of their folder names, and this one's
+	 * comes before WP Optimizer's, so at file scope its constant is not
+	 * defined yet.
+	 *
 	 * @return void
 	 */
 	public static function boot(): void {
+		if ( defined( self::LEGACY_CONSTANT ) ) {
+			add_action( 'admin_notices', array( self::class, 'render_waiting_notice' ) );
+
+			return;
+		}
+
 		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
@@ -155,6 +180,28 @@ final class Plugin {
 					self::MIN_WC_VERSION
 				)
 			)
+		);
+	}
+
+	/**
+	 * Shows the notice while WP Optimizer is still active.
+	 *
+	 * Static, because nothing is booted while it shows: the instance would
+	 * register the services. For the same reason it loads the translations
+	 * itself, since load_textdomain() is hooked by the constructor.
+	 *
+	 * @return void
+	 */
+	public static function render_waiting_notice(): void {
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			return;
+		}
+
+		load_plugin_textdomain( 'rhinnoit-customizer', false, dirname( RCUS_BASENAME ) . '/languages' );
+
+		printf(
+			'<div class="notice notice-warning"><p>%s</p></div>',
+			esc_html__( 'Customizer waits until WP Optimizer is deactivated, and does nothing until then.', 'rhinnoit-customizer' )
 		);
 	}
 

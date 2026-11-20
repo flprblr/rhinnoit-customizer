@@ -20,6 +20,18 @@ final class Install {
 	const string VERSION_OPTION = Settings::OPTION_PREFIX . 'version';
 
 	/**
+	 * Option prefix of the plugin this one replaces, RHINNO IT - WP Optimizer.
+	 *
+	 * Written out rather than derived: it names what existed before, so it
+	 * must NOT follow a rename. Renamed to this plugin's own prefix, the copy
+	 * would read every option back into itself and carry nothing over.
+	 * Plugin::LEGACY_CONSTANT and the three keys Store_Choice and
+	 * Store_Stock_Hold read in place keep WP Optimizer's spelling for the same
+	 * reason.
+	 */
+	const string LEGACY_PREFIX = 'rwpo_';
+
+	/**
 	 * Group hook that reports a change making cached pages stale.
 	 *
 	 * No plugin prefix, like the menu constants: every plugin of the group
@@ -35,9 +47,14 @@ final class Install {
 	 * Runs on activation.
 	 *
 	 * Seeds the site it runs on. A network activation on multisite seeds only
-	 * the current site; the others get their defaults the first time their
-	 * dashboard loads, through check_version(). uninstall.php makes the same
-	 * single-site assumption.
+	 * the current site; the others get their defaults and migration the first
+	 * time their dashboard loads, through check_version(). uninstall.php makes
+	 * the same single-site assumption.
+	 *
+	 * It runs while WP Optimizer is still active too: the guard in
+	 * Plugin::boot() holds back the services, not this. The copy has to be
+	 * made before WP Optimizer is deleted, because its uninstaller deletes the
+	 * rows the copy reads.
 	 *
 	 * @return void
 	 */
@@ -81,6 +98,7 @@ final class Install {
 	 * @return void
 	 */
 	private static function seed_defaults(): void {
+		self::migrate_legacy_options();
 		self::inherit_split_options();
 
 		foreach ( Settings::defaults() as $option => $value ) {
@@ -88,6 +106,43 @@ final class Install {
 		}
 
 		update_option( self::VERSION_OPTION, RCUS_VERSION );
+	}
+
+	/**
+	 * Carries the settings of the plugin this one replaces.
+	 *
+	 * This plugin took over the shop half of RHINNO IT - WP Optimizer, with
+	 * the rwpo_ prefix, when it was split in two. A new slug means WordPress
+	 * sees a new plugin, so without this every site would start over from the
+	 * defaults. It copies, it never moves: the old plugin keeps its own
+	 * options until its own uninstaller removes them, which is also what
+	 * makes deleting it from the admin safe once this one is activated - this
+	 * plugin's prefix is different, so that uninstaller cannot reach these.
+	 *
+	 * Only this plugin's own options are looked up there. WP Optimizer's other
+	 * switches belong to RHINNO IT - Optimizer, and its version row is its
+	 * own: this plugin records its version itself.
+	 *
+	 * A value somebody set here is never overwritten by an older one from
+	 * there, and it is add_option() that guarantees it: it writes nothing when
+	 * the option already exists. That is also why this runs before the
+	 * defaults are written, not after.
+	 *
+	 * @return void
+	 */
+	private static function migrate_legacy_options(): void {
+		$missing = new \stdClass();
+
+		foreach ( Settings::option_ids() as $option ) {
+			$legacy = self::LEGACY_PREFIX . substr( $option, strlen( Settings::OPTION_PREFIX ) );
+			$value  = get_option( $legacy, $missing );
+
+			if ( $value === $missing ) {
+				continue;
+			}
+
+			add_option( $option, $value );
+		}
 	}
 
 	/**

@@ -53,6 +53,15 @@ if ( '1' === getenv( 'RCUS_TESTS_WELAUNCH' ) ) {
 	function welaunch_woocommerce_multi_inventory_run() {}
 }
 
+/*
+ * WP Optimizer still active beside this plugin, for the cases of the
+ * hand-over: RCUS_TESTS_WP_OPTIMIZER=1. Its main file defines this when it
+ * loads; the name is WP Optimizer's, written out, not this plugin's.
+ */
+if ( '1' === getenv( 'RCUS_TESTS_WP_OPTIMIZER' ) ) {
+	define( 'RWPO_VERSION', '2.8.13' );
+}
+
 /**
  * Mutable state the stubs read. Reset it from setUp().
  */

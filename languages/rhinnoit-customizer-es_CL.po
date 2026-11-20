@@ -50,6 +50,10 @@ msgstr "Ajustes guardados."
 msgid "Customizer needs WooCommerce %s or higher, and does nothing until then."
 msgstr "Customizer necesita WooCommerce %s o superior, y no hace nada hasta entonces."
 
+#: includes/class-plugin.php
+msgid "Customizer waits until WP Optimizer is deactivated, and does nothing until then."
+msgstr "Customizer espera a que se desactive WP Optimizer, y no hace nada hasta entonces."
+
 #: includes/class-settings.php
 msgid "Enable"
 msgstr "Activar"
