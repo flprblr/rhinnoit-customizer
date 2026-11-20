@@ -118,6 +118,23 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	/**
+	 * The form shows one card per thing the shop runs, in order.
+	 *
+	 * @return void
+	 */
+	public function test_a_shop_sees_a_card_per_domain(): void {
+		$html = $this->form();
+
+		$this->assertStringContainsString( '<h2 class="rcus-card__title">WooCommerce</h2>', $html );
+		$this->assertStringNotContainsString( '>WordPress</h2>', $html, 'Nothing this plugin does works without WooCommerce.' );
+		$this->assertLessThan( strpos( $html, '>WooCommerce</h2>' ), strpos( $html, 'for="rcus_enabled"' ), 'The master switch above every card.' );
+		$this->assertSame( 2, substr_count( $html, '<section class="rcus-card">' ), 'The master switch, then one card per domain.' );
+		$this->assertSame( 1, substr_count( $html, '<h2' ), 'The master switch has no heading of its own.' );
+		$this->assertSame( substr_count( $html, '<section' ), substr_count( $html, '</section>' ), 'Every card closes what it opened.' );
+		$this->assertSame( substr_count( $html, '<div' ), substr_count( $html, '</div>' ), 'Every row closes what it opened.' );
+	}
+
+	/**
 	 * Every checkbox is drawn as an on/off switch, and its row label toggles it.
 	 *
 	 * Still a real checkbox, so the save logic above does not change; the role
@@ -130,11 +147,25 @@ final class SettingsPageTest extends TestCase {
 		$html       = $this->form();
 		$checkboxes = substr_count( $html, 'type="checkbox"' );
 
-		$this->assertSame( 1, $checkboxes, 'The master switch.' );
+		$this->assertSame( 9, $checkboxes, 'One switch per feature that can apply, plus the master switch: not the Fintoc one on a site without it.' );
 		$this->assertSame( $checkboxes, substr_count( $html, 'type="checkbox" role="switch" class="rcus-switch"' ) );
 		$this->assertStringContainsString( '<label class="rcus-row__label" for="rcus_enabled">Enable</label>', $html );
 		$this->assertStringContainsString( 'aria-describedby="rcus_enabled-desc"', $html );
 		$this->assertStringContainsString( '<p class="rcus-row__desc" id="rcus_enabled-desc">', $html );
+	}
+
+	/**
+	 * A group label is printed once, above the first switch of its run.
+	 *
+	 * @return void
+	 */
+	public function test_a_group_label_heads_its_run_once(): void {
+		$html = $this->form();
+
+		$this->assertSame( 1, substr_count( $html, '<h3 class="rcus-card__group">Cart and checkout</h3>' ) );
+		$this->assertLessThan( strpos( $html, 'for="rcus_express_checkout"' ), strpos( $html, '>Cart and checkout</h3>' ) );
+		$this->assertGreaterThan( strpos( $html, 'for="rcus_checkout_commune_select"' ), strpos( $html, '>Orders</h3>' ) );
+		$this->assertSame( 2, substr_count( $html, '<h3 class="rcus-card__group">' ), 'Cart and checkout, then Orders, each once.' );
 	}
 
 	/**
@@ -236,6 +267,52 @@ final class SettingsPageTest extends TestCase {
 	}
 
 	/**
+	 * A field that was not on the screen is not stored as unchecked.
+	 *
+	 * The field list is rebuilt at save time. If WooCommerce became available
+	 * while the form was open, its section was never drawn, and storing its
+	 * absent boxes as "no" would switch off the struck-through price that
+	 * nobody touched.
+	 *
+	 * @return void
+	 */
+	public function test_a_field_that_was_not_drawn_is_left_alone(): void {
+		$fields = Settings_Page::fields_to_save(
+			Settings::fields(),
+			array( 'rcus_drawn' => array( 'rcus_enabled' ) )
+		);
+
+		$this->assertSame( array( 'rcus_enabled' ), array_column( $fields, 'id' ) );
+		$this->assertArrayNotHasKey(
+			'rcus_cart_sale_price',
+			Settings_Page::sanitize_submission( $fields, array() ),
+			'Undrawn, so its stored value survives.'
+		);
+	}
+
+	/**
+	 * The drawn list can narrow the save but never widen it.
+	 *
+	 * @return void
+	 */
+	public function test_the_drawn_list_cannot_name_a_field_this_site_lacks(): void {
+		$wordpress_only = array_values(
+			array_filter(
+				Settings::fields(),
+				static fn ( array $field ): bool => 'woocommerce' !== ( $field['requires'] ?? '' )
+			)
+		);
+
+		$fields = Settings_Page::fields_to_save(
+			$wordpress_only,
+			array( 'rcus_drawn' => array( 'rcus_checkout_coupon_prompt', 'siteurl', array( 'x' ) ) )
+		);
+
+		$this->assertSame( array(), $fields, 'A crafted marker is intersected with what the site can use.' );
+		$this->assertSame( array(), Settings_Page::fields_to_save( $wordpress_only, array( 'rcus_drawn' => 'not a list' ) ) );
+	}
+
+	/**
 	 * Every option the form draws carries its marker, once.
 	 *
 	 * @return void
@@ -243,7 +320,7 @@ final class SettingsPageTest extends TestCase {
 	public function test_every_drawn_option_carries_its_marker(): void {
 		$html = $this->form();
 
-		foreach ( array( 'rcus_enabled' ) as $id ) {
+		foreach ( array( 'rcus_enabled', 'rcus_cart_sale_price', 'rcus_unpaid_orders' ) as $id ) {
 			$this->assertSame( 1, substr_count( $html, sprintf( 'name="rcus_drawn[]" value="%s"', $id ) ), sprintf( '%s is drawn once, so it is marked once.', $id ) );
 		}
 

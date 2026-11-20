@@ -26,6 +26,19 @@ final class SettingsGateTest extends TestCase {
 	}
 
 	/**
+	 * A feature with no stored value falls back to its declared default.
+	 *
+	 * @return void
+	 */
+	public function test_an_unconfigured_feature_uses_its_declared_default(): void {
+		$this->assertTrue( Settings::feature( 'cart_sale_price' ), 'The struck-through price ships on.' );
+		$this->assertFalse( Settings::feature( 'express_checkout' ), 'A journey change ships off.' );
+		$this->assertFalse( Settings::feature( 'express_checkout_all' ), 'A journey change ships off.' );
+		$this->assertFalse( Settings::feature( 'checkout_coupon_prompt' ), 'A journey change ships off.' );
+		$this->assertFalse( Settings::feature( 'checkout_login_prompt' ), 'A journey change ships off.' );
+	}
+
+	/**
 	 * The master switch takes every feature down with it.
 	 *
 	 * @return void

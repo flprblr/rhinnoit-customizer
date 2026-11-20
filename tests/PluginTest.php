@@ -40,12 +40,40 @@ final class PluginTest extends TestCase {
 				sprintf( 'The %s bundle leaves a throttle transient behind.', $bundle )
 			);
 		}
+
+		// A log window opened under a literal key is a transient of its own.
+		$windows = array();
+		$sources = array_merge( glob( dirname( __DIR__ ) . '/includes/*.php' ) ?: array(), glob( dirname( __DIR__ ) . '/includes/*/*.php' ) ?: array() );
+
+		foreach ( $sources as $file ) {
+			preg_match_all( "/error_once\(\s*'(rcus_[a-z0-9_]+)'/", (string) file_get_contents( $file ), $found );
+			array_push( $windows, ...$found[1] );
+		}
+
+		$this->assertContains( 'rcus_coupon_split_table', $windows, 'The scan found none of the windows it knows of, so it checks nothing.' );
+
+		foreach ( $windows as $window ) {
+			$this->assertStringContainsString(
+				"delete_transient( '" . $window . "' )",
+				$uninstall,
+				sprintf( 'The %s log window is written by the plugin but never deleted.', $window )
+			);
+		}
 	}
 
 	public function test_defaults_come_from_the_field_definition(): void {
 		$this->assertSame(
 			array(
-				'rcus_enabled' => 'no',
+				'rcus_enabled'                 => 'yes',
+				'rcus_express_checkout'        => 'no',
+				'rcus_express_checkout_all'    => 'no',
+				'rcus_cart_sale_price'         => 'yes',
+				'rcus_cart_coupon_split'       => 'yes',
+				'rcus_checkout_coupon_prompt'  => 'no',
+				'rcus_checkout_login_prompt'   => 'no',
+				'rcus_checkout_commune_select' => 'yes',
+				'rcus_unpaid_orders'           => 'yes',
+				'rcus_fintoc_session_expiry'   => 'yes',
 			),
 			Settings::defaults()
 		);
@@ -106,11 +134,13 @@ final class PluginTest extends TestCase {
 	}
 
 	public function test_activation_seeds_defaults_without_overwriting_existing_values(): void {
-		WP_Stub::$options = array( 'rcus_enabled' => 'yes' );
+		// The opposite of the declared default, or a reseed would look the same.
+		WP_Stub::$options = array( 'rcus_enabled' => 'no' );
 
 		Install::activate();
 
-		$this->assertSame( 'yes', WP_Stub::$options['rcus_enabled'], 'An existing choice must survive reactivation.' );
+		$this->assertSame( 'no', WP_Stub::$options['rcus_enabled'], 'An existing choice must survive reactivation.' );
+		$this->assertSame( 'no', WP_Stub::$options['rcus_express_checkout'], 'A journey change never switches itself on.' );
 		$this->assertSame( RCUS_VERSION, WP_Stub::$options[ Install::VERSION_OPTION ] );
 	}
 
@@ -119,7 +149,7 @@ final class PluginTest extends TestCase {
 
 		Install::check_version();
 
-		$this->assertSame( 'no', WP_Stub::$options['rcus_enabled'] );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_enabled'] );
 		$this->assertSame( RCUS_VERSION, WP_Stub::$options[ Install::VERSION_OPTION ] );
 		$this->assertContains( array( Install::DIRTY_HOOK, 'site' ), WP_Stub::$fired, 'New code can print every page differently, and a copied build fires no upgrader hook.' );
 	}

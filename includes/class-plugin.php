@@ -10,6 +10,13 @@ namespace RhinnoIT\Customizer;
 use Automattic\WooCommerce\Utilities\FeaturesUtil;
 use RhinnoIT\Customizer\Admin\Menu;
 use RhinnoIT\Customizer\Admin\Plugin_Links;
+use RhinnoIT\Customizer\Frontend\Cart_Sale_Price;
+use RhinnoIT\Customizer\Frontend\Checkout_Focus;
+use RhinnoIT\Customizer\Frontend\Commune_Select;
+use RhinnoIT\Customizer\Frontend\Coupon_Split;
+use RhinnoIT\Customizer\Frontend\Express_Checkout;
+use RhinnoIT\Customizer\Frontend\Fintoc_Session_Expiry;
+use RhinnoIT\Customizer\Frontend\Unpaid_Orders;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -47,9 +54,11 @@ final class Plugin {
 	/**
 	 * Declares compatibility with the WooCommerce features.
 	 *
-	 * Set `cart_checkout_blocks` to false only if the plugin breaks the block
-	 * checkout; a hook on the classic (shortcode) checkout that just does
-	 * nothing on the block one stays compatible.
+	 * Blocks stay declared compatible although Checkout_Focus and
+	 * Commune_Select act on the classic (shortcode) checkout only: on the block
+	 * checkout they do nothing, and they break nothing. Set
+	 * `cart_checkout_blocks` to false only for a service that would break the
+	 * block checkout.
 	 *
 	 * @return void
 	 */
@@ -65,22 +74,28 @@ final class Plugin {
 	/**
 	 * Registers the services.
 	 *
-	 * Two halves, and only one of them needs WooCommerce. The WordPress half
-	 * works on any site, so it registers first and always; the WooCommerce half
-	 * registers only on a version this plugin supports. A shop running an older
-	 * WooCommerce still gets the WordPress half and a notice saying why the other
-	 * half is missing, rather than nothing at all.
+	 * Two halves, and only one of them needs WooCommerce. The WordPress half is
+	 * the admin bundle alone, so the screen works on any site; every service
+	 * acts on the shop and registers only on a WooCommerce this plugin
+	 * supports. A shop running an older WooCommerce gets a notice saying why
+	 * the plugin does nothing, rather than silence.
 	 */
 	private function __construct() {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 
 		( new Assets() )->register();
 
-		// phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedIf -- The WooCommerce half of the shell, empty until a plugin has one.
 		if ( self::woocommerce_is_supported() ) {
 			// A service whose job needs WooCommerce registers here and nowhere
 			// else, and lives in includes/frontend/. The WordPress half above
 			// touches WooCommerce only behind a guard.
+			( new Express_Checkout() )->register();
+			( new Checkout_Focus() )->register();
+			( new Commune_Select() )->register();
+			( new Cart_Sale_Price() )->register();
+			( new Coupon_Split() )->register();
+			( new Unpaid_Orders() )->register();
+			( new Fintoc_Session_Expiry() )->register();
 		} elseif ( self::woocommerce_is_active() ) {
 			add_action( 'admin_notices', array( $this, 'render_unsupported_notice' ) );
 		}
@@ -103,7 +118,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Shows the notice when WooCommerce is present but too old for its half.
+	 * Shows the notice when WooCommerce is present but too old for this plugin.
 	 *
 	 * @return void
 	 */
@@ -117,7 +132,7 @@ final class Plugin {
 			esc_html(
 				sprintf(
 					/* translators: %s: minimum WooCommerce version. */
-					__( 'Customizer is running, but its WooCommerce half needs WooCommerce %s or higher.', 'rhinnoit-customizer' ),
+					__( 'Customizer needs WooCommerce %s or higher, and does nothing until then.', 'rhinnoit-customizer' ),
 					self::MIN_WC_VERSION
 				)
 			)

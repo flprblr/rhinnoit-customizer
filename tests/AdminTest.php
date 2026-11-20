@@ -269,6 +269,25 @@ final class AdminTest extends TestCase {
 		$this->assertStringNotContainsString( 'nav-tab', $html, 'One screen does not need a tab bar.' );
 	}
 
+	public function test_a_save_leaves_every_undrawn_option_alone(): void {
+		// A field the form did not draw is absent from the post, exactly like
+		// an unchecked box. Only the drawn list tells them apart.
+		WP_Stub::$options['rcus_cart_sale_price']  = 'yes';
+		WP_Stub::$options['rcus_express_checkout'] = 'yes';
+		WP_Stub::$options['rcus_unpaid_orders']    = 'yes';
+
+		$_POST = array(
+			'rcus_enabled' => 'yes',
+			'rcus_drawn'   => array( 'rcus_enabled' ),
+		);
+
+		$this->save();
+
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_cart_sale_price'] );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_express_checkout'] );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_unpaid_orders'] );
+	}
+
 	public function test_saving_requires_the_capability(): void {
 		WP_Stub::$can = false;
 
@@ -309,15 +328,17 @@ final class AdminTest extends TestCase {
 		WP_Stub::$options['rcus_enabled'] = 'no';
 
 		// What a browser posts: the checked boxes, and the list of fields the
-		// form drew.
+		// form drew. The struck-through price was drawn and left unchecked, so
+		// it is absent from the post.
 		$_POST = array(
 			'rcus_enabled' => 'yes',
-			'rcus_drawn'   => array( 'rcus_enabled' ),
+			'rcus_drawn'   => array( 'rcus_enabled', 'rcus_cart_sale_price' ),
 		);
 
 		$this->save();
 
 		$this->assertSame( 'yes', WP_Stub::$options['rcus_enabled'] ?? null, 'A checked box is stored.' );
+		$this->assertSame( 'no', WP_Stub::$options['rcus_cart_sale_price'] ?? null, 'A box the browser did not send was unchecked.' );
 		$this->assertContains( array( Settings_Page::SAVED_HOOK ), WP_Stub::$fired, 'The group hears every save, or the page cache serves the old pages.' );
 		$this->assertStringContainsString( 'page=' . Menu::PAGE_SLUG, (string) WP_Stub::$redirect );
 		$this->assertStringContainsString( 'updated=1', (string) WP_Stub::$redirect );

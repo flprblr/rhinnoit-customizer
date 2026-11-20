@@ -47,8 +47,8 @@ msgstr "Ajustes guardados."
 #. translators: %s: minimum WooCommerce version.
 #: includes/class-plugin.php
 #, php-format
-msgid "Customizer is running, but its WooCommerce half needs WooCommerce %s or higher."
-msgstr "Customizer está funcionando, pero su mitad de WooCommerce necesita WooCommerce %s o superior."
+msgid "Customizer needs WooCommerce %s or higher, and does nothing until then."
+msgstr "Customizer necesita WooCommerce %s o superior, y no hace nada hasta entonces."
 
 #: includes/class-settings.php
 msgid "Enable"
@@ -61,3 +61,91 @@ msgstr "Si lo apagas, todo lo de abajo se detiene, sin desactivar el plugin."
 #: includes/class-settings.php
 msgid "WooCommerce"
 msgstr "WooCommerce"
+
+#: includes/class-settings.php
+msgid "Cart and checkout"
+msgstr "Carrito y pago"
+
+#: includes/class-settings.php
+msgid "Skip the cart for virtual products"
+msgstr "Saltar el carrito con productos virtuales"
+
+#: includes/class-settings.php
+msgid "After adding a product, shoppers go straight to checkout if the cart holds only virtual products."
+msgstr "Al añadir un producto, el cliente va directamente a la página de pago si el carrito solo tiene productos virtuales."
+
+#: includes/class-settings.php
+msgid "Skip the cart for any product"
+msgstr "Saltar el carrito con cualquier producto"
+
+#: includes/class-settings.php
+msgid "After adding any product, physical ones included, shoppers go straight to checkout."
+msgstr "Al añadir cualquier producto, incluso uno físico, el cliente va directamente a la página de pago."
+
+#: includes/class-settings.php
+msgid "Show the regular price struck through"
+msgstr "Mostrar el precio normal tachado"
+
+#: includes/class-settings.php
+msgid "In the mini cart, cart and checkout, products on sale keep showing their discount. Check all three on a phone."
+msgstr "En el minicarrito, el carrito y la página de pago, los productos en oferta siguen mostrando su descuento. Revisa los tres en un teléfono."
+
+#: includes/class-settings.php
+msgid "Split cart coupons by price"
+msgstr "Repartir los cupones del carrito según el precio"
+
+#: includes/class-settings.php
+msgid "A fixed cart discount is shared out by each product's price, so a cheap product never ends up free."
+msgstr "Un descuento fijo en el carrito se reparte según el precio de cada producto, así uno barato nunca queda gratis."
+
+#: includes/class-settings.php
+msgid "Hide the coupon prompt"
+msgstr "Ocultar el aviso de cupón"
+
+#: includes/class-settings.php
+msgid "If the cart holds only virtual products, the classic checkout does not show the coupon field."
+msgstr "Si el carrito solo tiene productos virtuales, la página de pago clásica no muestra el campo de cupón."
+
+#: includes/class-settings.php
+msgid "Hide the login prompt"
+msgstr "Ocultar el aviso para iniciar sesión"
+
+#: includes/class-settings.php
+msgid "If the cart holds only virtual products, the classic checkout does not invite shoppers to log in."
+msgstr "Si el carrito solo tiene productos virtuales, la página de pago clásica no invita a iniciar sesión."
+
+#: includes/class-settings.php
+msgid "Pick the commune from a list"
+msgstr "Elegir la comuna de una lista"
+
+#: includes/class-settings.php
+msgid "For an address in Chile, the classic checkout offers the chosen region's communes in a dropdown, like the region. Check the checkout on a phone."
+msgstr "En una dirección de Chile, la página de pago clásica ofrece las comunas de la región elegida en un desplegable, como la región. Revisa la página de pago en un teléfono."
+
+#: includes/class-settings.php
+msgid "Orders"
+msgstr "Pedidos"
+
+#: includes/class-settings.php
+msgid "Cancel unpaid orders on time"
+msgstr "Cancelar a tiempo los pedidos sin pagar"
+
+#: includes/class-settings.php
+msgid "With a stock hold of 15 minutes or more, unpaid orders are cancelled soon after it ends."
+msgstr "Si la reserva de stock dura 15 minutos o más, los pedidos sin pagar se cancelan poco después de que termine."
+
+#: includes/class-settings.php
+msgid "Avoid late Fintoc payments"
+msgstr "Evitar pagos tardíos con Fintoc"
+
+#: includes/class-settings.php
+msgid "The time to pay with Fintoc ends with the stock hold, instead of lasting 24 hours."
+msgstr "El plazo para pagar con Fintoc termina con la reserva de stock, en vez de durar 24 horas."
+
+#: includes/frontend/class-commune-select.php
+msgid "Choose a commune…"
+msgstr "Elige una comuna…"
+
+#: includes/frontend/class-commune-select.php
+msgid "Choose the region first"
+msgstr "Elige primero la región"

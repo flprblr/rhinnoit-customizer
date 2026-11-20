@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Menu;
 use RhinnoIT\Customizer\Admin\Settings_Page;
 use RhinnoIT\Customizer\Plugin;
+use RhinnoIT\Customizer\Settings;
 
 #[CoversClass( Plugin::class )]
 final class BootWithoutWooCommerceTest extends TestCase {
@@ -38,10 +39,17 @@ final class BootWithoutWooCommerceTest extends TestCase {
 		$this->assertFalse( function_exists( 'is_shop' ), 'The child has to lack the WooCommerce functions too.' );
 
 		WP_Stub::reset();
+		WP_Stub::$options['rcus_express_checkout'] = 'yes';
+		WP_Stub::$options['rcus_unpaid_orders']    = 'yes';
+		WP_Stub::$options['rcus_cart_sale_price']  = 'yes';
 		Plugin::boot();
 
 		$this->assertContains( 'admin_enqueue_scripts:enqueue_admin', WP_Stub::$callbacks, 'The WordPress half runs here.' );
 		$this->assertContains( 'admin_menu', WP_Stub::$hooks, 'The page exists, or nobody could configure it.' );
+
+		$this->assertNotContains( 'woocommerce_add_to_cart_redirect', WP_Stub::$hooks, 'Switched on, and still WooCommerce half only.' );
+		$this->assertNotContains( 'woocommerce_cancel_unpaid_orders_interval_minutes', WP_Stub::$hooks, 'Switched on, and still WooCommerce half only.' );
+		$this->assertNotContains( 'woocommerce_cart_item_price', WP_Stub::$hooks, 'Switched on, and still WooCommerce half only.' );
 		$this->assertNotContains( 'admin_notices', WP_Stub::$hooks, 'No WooCommerce is a valid site, not an error to announce.' );
 	}
 
@@ -58,6 +66,43 @@ final class BootWithoutWooCommerceTest extends TestCase {
 	}
 
 	#[RunInSeparateProcess]
+	public function test_the_woocommerce_section_is_not_on_the_screen(): void {
+		$ids = array_column( Settings::available_fields(), 'id' );
+
+		$this->assertContains( 'rcus_enabled', $ids );
+		$this->assertNotContains( 'rcus_cart_sale_price', $ids );
+		$this->assertNotContains( 'rcus_woocommerce', $ids, 'The section heading goes with its fields.' );
+	}
+
+	#[RunInSeparateProcess]
+	public function test_a_crafted_post_cannot_write_the_woocommerce_options(): void {
+		WP_Stub::reset();
+		WP_Stub::$options['rcus_enabled']                = 'no';
+		WP_Stub::$options['rcus_cart_sale_price']        = 'yes';
+		WP_Stub::$options['rcus_checkout_coupon_prompt'] = 'no';
+
+		// Somebody holding manage_options posts the WooCommerce fields, markers
+		// and all, on a site whose screen never showed them.
+		$_POST = array(
+			'rcus_checkout_coupon_prompt' => 'yes',
+			'rcus_express_checkout'       => 'yes',
+			'rcus_enabled'                => 'yes',
+			'rcus_drawn'                  => array( 'rcus_checkout_coupon_prompt', 'rcus_express_checkout', 'rcus_cart_sale_price', 'rcus_enabled' ),
+		);
+
+		try {
+			( new Settings_Page() )->save();
+		} catch ( WP_Halt $e ) {
+			unset( $e );
+		}
+
+		$this->assertSame( 'no', WP_Stub::$options['rcus_checkout_coupon_prompt'], 'A hidden field cannot be written.' );
+		$this->assertArrayNotHasKey( 'rcus_express_checkout', WP_Stub::$options );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_cart_sale_price'], 'A value waiting for WooCommerce is kept.' );
+		$this->assertSame( 'yes', WP_Stub::$options['rcus_enabled'], 'The master switch saves normally.' );
+	}
+
+	#[RunInSeparateProcess]
 	public function test_the_form_draws_only_the_master_switch(): void {
 		WP_Stub::reset();
 
@@ -66,6 +111,7 @@ final class BootWithoutWooCommerceTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringNotContainsString( '>WooCommerce</h2>', $html );
+		$this->assertStringNotContainsString( 'name="rcus_express_checkout"', $html );
 		$this->assertSame( 1, substr_count( $html, '<section class="rcus-card">' ), 'The master switch alone: this plugin has no WordPress card.' );
 	}
 }

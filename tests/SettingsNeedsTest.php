@@ -7,23 +7,30 @@
  * answers each mark. A mark it does not answer counts as missing, so a typo
  * hides its field on every site with no error anywhere.
  *
- * The template ships no 'needs' mark, only the WooCommerce section's
- * 'requires', so the rules themselves are pinned on Settings::fields_for_marks()
- * with fields and marks of the cases' own. A plugin's first NEEDS_* mark
- * brings its own cases here too: its field hidden where the mark is missing,
- * drawn where it is there, and its stored value kept either way.
+ * The rules themselves are pinned on Settings::fields_for_marks() with fields
+ * and marks of the cases' own. Each NEEDS_* mark brings its own cases here
+ * too: its field hidden where the mark is missing, drawn where it is there,
+ * and its stored value kept either way.
+ *
+ * The shared process is a shop without Fintoc, on a WooCommerce whose
+ * WC_Discounts hands a coupon's items over. The cases that need Fintoc or an
+ * older WooCommerce run in their own process: SettingsWithFintocTest and
+ * CouponSplitBeforeItemsFilterTest.
  *
  * @package RhinnoIT\Customizer
  */
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use RhinnoIT\Customizer\Admin\Settings_Page;
+use RhinnoIT\Customizer\Frontend\Coupon_Split;
 use RhinnoIT\Customizer\Settings;
 
 /**
  * Covers the marks of Settings::available_fields().
  */
 #[CoversClass( Settings::class )]
+#[CoversClass( Settings_Page::class )]
 final class SettingsNeedsTest extends TestCase {
 
 	/**
@@ -33,6 +40,83 @@ final class SettingsNeedsTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		WP_Stub::reset();
+	}
+
+	/**
+	 * Ids of the fields this site's screen draws.
+	 *
+	 * @return array<int, string>
+	 */
+	private static function drawn(): array {
+		return array_column( Settings::available_fields(), 'id' );
+	}
+
+	/**
+	 * Without Fintoc its switch is not offered; the coupon split, which this WooCommerce feeds, is.
+	 *
+	 * @return void
+	 */
+	public function test_a_switch_that_cannot_act_here_is_not_on_the_screen(): void {
+		$this->assertFalse( defined( 'FINTOC_WC_VERSION' ), 'The process has Fintoc, or this case means nothing.' );
+		$this->assertTrue( Coupon_Split::can_split(), 'The process cannot split coupons, or this case means nothing.' );
+
+		$ids = self::drawn();
+
+		$this->assertNotContains( 'rcus_fintoc_session_expiry', $ids, 'rcus_fintoc_session_expiry does nothing on this site.' );
+
+		foreach ( array( 'rcus_woocommerce', 'rcus_cart_coupon_split', 'rcus_unpaid_orders' ) as $id ) {
+			$this->assertContains( $id, $ids, sprintf( '%s can act here.', $id ) );
+		}
+	}
+
+	/**
+	 * A post naming a hidden switch cannot write it, and its value is kept.
+	 *
+	 * @return void
+	 */
+	public function test_a_hidden_switch_keeps_its_value_whatever_the_post_says(): void {
+		$posted = array(
+			'rcus_fintoc_session_expiry' => 'yes',
+			'rcus_unpaid_orders'         => 'yes',
+			Settings_Page::DRAWN_FIELD   => array( 'rcus_fintoc_session_expiry', 'rcus_unpaid_orders' ),
+		);
+
+		$values = Settings_Page::sanitize_submission( Settings_Page::fields_to_save( Settings::available_fields(), $posted ), $posted );
+
+		$this->assertSame( array( 'rcus_unpaid_orders' => 'yes' ), $values );
+	}
+
+	/**
+	 * On a WooCommerce that hands no items over, the coupon split is off the screen and its value stays.
+	 *
+	 * The form of a site that offered it, posted with the box unchecked: were
+	 * the switch still saved, its absence would store it as off.
+	 *
+	 * @return void
+	 */
+	public function test_a_coupon_split_this_woocommerce_cannot_run_keeps_its_value(): void {
+		$fields = Settings::fields_for_marks( Settings::fields(), array( Settings::NEEDS_COUPON_ITEMS => false ) + Settings::conditions() );
+		$posted = array(
+			'rcus_cart_sale_price'     => 'yes',
+			Settings_Page::DRAWN_FIELD => array( 'rcus_cart_coupon_split', 'rcus_cart_sale_price' ),
+		);
+
+		$this->assertNotContains( 'rcus_cart_coupon_split', array_column( $fields, 'id' ) );
+		$this->assertContains( 'rcus_cart_sale_price', array_column( $fields, 'id' ), 'The rest of the card stays.' );
+		$this->assertSame( array( 'rcus_cart_sale_price' => 'yes' ), Settings_Page::sanitize_submission( Settings_Page::fields_to_save( $fields, $posted ), $posted ) );
+	}
+
+	/**
+	 * Hiding a switch never changes what it does: a hidden one still reads its row.
+	 *
+	 * @return void
+	 */
+	public function test_hiding_is_only_the_screen(): void {
+		WP_Stub::$options['rcus_fintoc_session_expiry'] = 'no';
+
+		$this->assertNotContains( 'rcus_fintoc_session_expiry', self::drawn() );
+		$this->assertFalse( Settings::feature( 'fintoc_session_expiry' ) );
+		$this->assertContains( 'rcus_fintoc_session_expiry', Settings::option_ids(), 'Still an option: seeded and uninstalled.' );
 	}
 
 	/**

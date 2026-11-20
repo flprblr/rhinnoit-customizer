@@ -24,6 +24,13 @@ final class HookArityTest extends TestCase {
 
 		$services = array(
 			new RhinnoIT\Customizer\Assets(),
+			new RhinnoIT\Customizer\Frontend\Express_Checkout(),
+			new RhinnoIT\Customizer\Frontend\Checkout_Focus(),
+			new RhinnoIT\Customizer\Frontend\Commune_Select(),
+			new RhinnoIT\Customizer\Frontend\Cart_Sale_Price(),
+			new RhinnoIT\Customizer\Frontend\Coupon_Split(),
+			new RhinnoIT\Customizer\Frontend\Unpaid_Orders(),
+			new RhinnoIT\Customizer\Frontend\Fintoc_Session_Expiry(),
 			new RhinnoIT\Customizer\Admin\Menu(),
 			new RhinnoIT\Customizer\Admin\Plugin_Links(),
 		);
@@ -45,9 +52,11 @@ final class HookArityTest extends TestCase {
 			++$checked;
 		}
 
-		// The listed services hook six methods: Assets 1, Menu 3, Settings_Page
-		// 1 through Menu, and Plugin_Links 1. Fewer means the list above lost a
+		// The listed services hook sixteen methods: Assets 1, Express_Checkout 2,
+		// Checkout_Focus 1, Commune_Select 1, Cart_Sale_Price 3, Coupon_Split 1,
+		// Unpaid_Orders 1, Fintoc_Session_Expiry 1, Menu 3, Settings_Page 1
+		// through Menu, and Plugin_Links 1. Fewer means the list above lost a
 		// service; raise it with every service added, lower it with one removed.
-		$this->assertGreaterThanOrEqual( 6, $checked, 'Most hooks went unchecked, so this case proves little.' );
+		$this->assertGreaterThanOrEqual( 16, $checked, 'Most hooks went unchecked, so this case proves little.' );
 	}
 }

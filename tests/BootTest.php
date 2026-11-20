@@ -12,6 +12,7 @@
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Settings_Page;
+use RhinnoIT\Customizer\Frontend\Commune_Select;
 use RhinnoIT\Customizer\Plugin;
 
 #[CoversClass( Plugin::class )]
@@ -31,6 +32,10 @@ final class BootTest extends TestCase {
 	 * @return void
 	 */
 	public function test_a_supported_woocommerce_gets_every_service(): void {
+		foreach ( array( 'express_checkout', 'checkout_coupon_prompt', 'unpaid_orders', 'cart_sale_price' ) as $switch ) {
+			WP_Stub::$options[ 'rcus_' . $switch ] = 'yes';
+		}
+
 		Plugin::boot();
 
 		// One callback per service, so dropping any registration goes red.
@@ -42,10 +47,20 @@ final class BootTest extends TestCase {
 				'admin_menu:register_pages',
 				'admin_post_' . Settings_Page::SAVE_ACTION . ':save',
 				'plugin_action_links_' . RCUS_BASENAME . ':add_settings_link',
+				'woocommerce_add_to_cart_redirect:redirect_to_checkout',
+				'template_redirect:drop_the_prompts',
+				'woocommerce_cart_item_subtotal:strike_line_subtotal',
+				'woocommerce_coupon_get_items_to_apply:split',
+				'woocommerce_cancel_unpaid_orders_interval_minutes:shorten_interval',
+				'woocommerce_fintoc_checkout_session_payload:end_with_hold',
 			) as $callback
 		) {
 			$this->assertContains( $callback, WP_Stub::$callbacks );
 		}
+
+		// add_script is a name more than one service can use, so the class
+		// says which one hooked it.
+		$this->assertContains( array( 'wp_enqueue_scripts', Commune_Select::class, 'add_script', 1 ), WP_Stub::$registered );
 
 		$this->assertNotContains( 'admin_notices', WP_Stub::$hooks, 'Nothing is wrong, so nothing is announced.' );
 	}

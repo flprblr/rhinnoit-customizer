@@ -7,6 +7,8 @@
 
 namespace RhinnoIT\Customizer;
 
+use RhinnoIT\Customizer\Frontend\Coupon_Split;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -23,6 +25,16 @@ final class Settings {
 	 * Value of 'requires' on every row of the WooCommerce section.
 	 */
 	const string REQUIRES_WOOCOMMERCE = 'woocommerce';
+
+	/**
+	 * A switch that needs Fintoc for WooCommerce: it hooks Fintoc's own filter.
+	 */
+	const string NEEDS_FINTOC = 'fintoc';
+
+	/**
+	 * A switch that needs WooCommerce 8.8+, whose WC_Discounts hands itself to woocommerce_coupon_get_items_to_apply.
+	 */
+	const string NEEDS_COUPON_ITEMS = 'coupon_items';
 
 	/**
 	 * Keys of the switches removed outright, without the prefix.
@@ -50,6 +62,13 @@ final class Settings {
 	 * is the condition the feature itself stops at, read from what is
 	 * installed, never from another plugin's settings. See conditions().
 	 *
+	 * Every switch ships on except the four that change the shopper's journey:
+	 * skipping the cart and hiding the checkout's coupon and login prompts
+	 * (owner's decision, 2026-10-16).
+	 *
+	 * 'group' is the small label the screen prints above a run of related
+	 * switches inside a section; consecutive fields share one label.
+	 *
 	 * The structural rows carry 'is_option' => false, which is the flag
 	 * Settings_Page::sanitize_submission() checks. Without it a crafted post
 	 * stores the section id in wp_options, where nothing reads it and
@@ -69,7 +88,7 @@ final class Settings {
 				'type'    => 'checkbox',
 				'title'   => __( 'Enable', 'rhinnoit-customizer' ),
 				'desc'    => __( 'If you turn it off, everything below stops, without deactivating the plugin.', 'rhinnoit-customizer' ),
-				'default' => 'no',
+				'default' => 'yes',
 			),
 			array(
 				'id'        => self::OPTION_PREFIX . 'general',
@@ -83,6 +102,89 @@ final class Settings {
 				'title'     => __( 'WooCommerce', 'rhinnoit-customizer' ),
 				'is_option' => false,
 				'requires'  => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'express_checkout',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Skip the cart for virtual products', 'rhinnoit-customizer' ),
+				'desc'     => __( 'After adding a product, shoppers go straight to checkout if the cart holds only virtual products.', 'rhinnoit-customizer' ),
+				'default'  => 'no',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'express_checkout_all',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Skip the cart for any product', 'rhinnoit-customizer' ),
+				'desc'     => __( 'After adding any product, physical ones included, shoppers go straight to checkout.', 'rhinnoit-customizer' ),
+				'default'  => 'no',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'cart_sale_price',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Show the regular price struck through', 'rhinnoit-customizer' ),
+				'desc'     => __( 'In the mini cart, cart and checkout, products on sale keep showing their discount. Check all three on a phone.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'cart_coupon_split',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Split cart coupons by price', 'rhinnoit-customizer' ),
+				'desc'     => __( 'A fixed cart discount is shared out by each product\'s price, so a cheap product never ends up free.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+				'needs'    => array( self::NEEDS_COUPON_ITEMS ),
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'checkout_coupon_prompt',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Hide the coupon prompt', 'rhinnoit-customizer' ),
+				'desc'     => __( 'If the cart holds only virtual products, the classic checkout does not show the coupon field.', 'rhinnoit-customizer' ),
+				'default'  => 'no',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'checkout_login_prompt',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Hide the login prompt', 'rhinnoit-customizer' ),
+				'desc'     => __( 'If the cart holds only virtual products, the classic checkout does not invite shoppers to log in.', 'rhinnoit-customizer' ),
+				'default'  => 'no',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'checkout_commune_select',
+				'type'     => 'checkbox',
+				'group'    => __( 'Cart and checkout', 'rhinnoit-customizer' ),
+				'title'    => __( 'Pick the commune from a list', 'rhinnoit-customizer' ),
+				'desc'     => __( 'For an address in Chile, the classic checkout offers the chosen region\'s communes in a dropdown, like the region. Check the checkout on a phone.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'unpaid_orders',
+				'type'     => 'checkbox',
+				'group'    => __( 'Orders', 'rhinnoit-customizer' ),
+				'title'    => __( 'Cancel unpaid orders on time', 'rhinnoit-customizer' ),
+				'desc'     => __( 'With a stock hold of 15 minutes or more, unpaid orders are cancelled soon after it ends.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'fintoc_session_expiry',
+				'type'     => 'checkbox',
+				'group'    => __( 'Orders', 'rhinnoit-customizer' ),
+				'title'    => __( 'Avoid late Fintoc payments', 'rhinnoit-customizer' ),
+				'desc'     => __( 'The time to pay with Fintoc ends with the stock hold, instead of lasting 24 hours.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+				'needs'    => array( self::NEEDS_FINTOC ),
 			),
 			array(
 				'id'        => self::OPTION_PREFIX . 'woocommerce',
@@ -201,21 +303,26 @@ final class Settings {
 	 *
 	 * Read when the screen is drawn or saved, long after the theme and every
 	 * plugin loaded, and from what is installed: a plugin's constant, the host,
-	 * the theme's kind, a core function. Each answer is the one the feature
-	 * itself stops at, so a field is hidden exactly where it would do nothing.
+	 * the theme's kind, a core function, WooCommerce's version and the class a
+	 * feature writes into. Each answer is the one the feature itself stops at,
+	 * so a field is hidden exactly where it would do nothing.
 	 * The empty mark is the one a field without 'requires' carries.
 	 *
-	 * The template ships no 'needs' mark. A plugin declares its own as NEEDS_*
-	 * constants and answers them here, in the same change as the first field
-	 * that names one: a mark this list does not answer hides its field on
-	 * every site.
+	 * Each 'needs' mark is a NEEDS_* constant answered here, in the same change
+	 * as the first field that names one: a mark this list does not answer
+	 * hides its field on every site.
 	 *
 	 * @return array<string, bool>
 	 */
 	public static function conditions(): array {
+		$woocommerce = Plugin::woocommerce_is_supported();
+
 		return array(
 			''                         => true,
-			self::REQUIRES_WOOCOMMERCE => Plugin::woocommerce_is_supported(),
+			self::REQUIRES_WOOCOMMERCE => $woocommerce,
+			// Defined when Fintoc's main file loads; its filter fires only from its gateway.
+			self::NEEDS_FINTOC         => defined( 'FINTOC_WC_VERSION' ),
+			self::NEEDS_COUPON_ITEMS   => $woocommerce && Coupon_Split::can_split(),
 		);
 	}
 

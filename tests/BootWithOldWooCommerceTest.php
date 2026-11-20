@@ -35,7 +35,13 @@ final class BootWithOldWooCommerceTest extends TestCase {
 
 		$this->assertContains( 'admin_notices', WP_Stub::$hooks, 'The shop is told why half is missing.' );
 		$this->assertContains( 'admin_enqueue_scripts:enqueue_admin', WP_Stub::$callbacks, 'And still gets the half that does not need WooCommerce.' );
-		$this->assertNotContains( 'rcus_woocommerce', array_column( Settings::available_fields(), 'id' ), 'The WooCommerce section stays off on a version it does not support.' );
+		$this->assertNotContains( 'woocommerce_cart_item_price', WP_Stub::$hooks, 'The WooCommerce half stays off on a version it does not support.' );
+
+		$ids = array_column( Settings::available_fields(), 'id' );
+
+		foreach ( array( 'rcus_woocommerce', 'rcus_cart_sale_price' ) as $id ) {
+			$this->assertNotContains( $id, $ids, 'No switch for a half that never registers.' );
+		}
 
 		// Supported decides what the plugin does with WooCommerce; active
 		// decides only what exists. An old version is the one place they differ.
