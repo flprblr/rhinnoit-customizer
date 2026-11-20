@@ -47,8 +47,13 @@ final class Cart_Sale_Price {
 
 	/**
 	 * Class of the span around the struck price.
+	 *
+	 * WP Optimizer's spelling, kept: WooCommerce puts back the mini cart a tab
+	 * stored before the switch on every page until the cart changes, and a page
+	 * cached or still open from before it gets this markup over AJAX, so the old
+	 * pages' rules and these have to match the same class.
 	 */
-	const string WRAPPER = 'rcus-sale-price';
+	const string WRAPPER = 'rwpo-sale-price';
 
 	/**
 	 * Handle of the inline style.
@@ -61,11 +66,11 @@ final class Cart_Sale_Price {
 	 * Two classes and an element beat Porto's .cart-popup .quantity .amount
 	 * !important; font-size needs !important against #mini-cart's id rule.
 	 */
-	const string CSS = ':where(.rcus-sale-price ins){color:var(--porto-color-price)}'
-		. '.rcus-sale-price del{display:inline-block;color:#a7a7a7;font-size:.8em;margin-right:.2143em;text-decoration:line-through;vertical-align:baseline}'
-		. '.rcus-sale-price ins{display:inline-block;text-decoration:none;vertical-align:baseline}'
-		. '.rcus-sale-price del .woocommerce-Price-amount.amount{color:inherit!important;font-size:inherit!important}'
-		. '.rcus-sale-price ins .woocommerce-Price-amount.amount{color:inherit!important}';
+	const string CSS = ':where(.rwpo-sale-price ins){color:var(--porto-color-price)}'
+		. '.rwpo-sale-price del{display:inline-block;color:#a7a7a7;font-size:.8em;margin-right:.2143em;text-decoration:line-through;vertical-align:baseline}'
+		. '.rwpo-sale-price ins{display:inline-block;text-decoration:none;vertical-align:baseline}'
+		. '.rwpo-sale-price del .woocommerce-Price-amount.amount{color:inherit!important;font-size:inherit!important}'
+		. '.rwpo-sale-price ins .woocommerce-Price-amount.amount{color:inherit!important}';
 
 	/**
 	 * Hooks both price filters while the switch is on.

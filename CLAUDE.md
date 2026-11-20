@@ -110,16 +110,18 @@ UI strings and documentation.
   .rcus-card__title`, handle `rcus-cart-sale-price`). JS globals: `rcus` +
   PascalCase, though there is none today: every inline script keeps to its
   own closure. The two group hooks are the exception: see Interface.
-- Three keys keep WP Optimizer's `rwpo` spelling, because pages cached or
+- Four keys keep WP Optimizer's `rwpo` spelling, because pages cached or
   still open from before the switch, and orders WP Optimizer marked, carry
   them: the order meta `_rwpo_store_units_taken`
   (`Store_Stock_Hold::UNITS_TAKEN`), the cookie `rwpo_cart_store`
-  (`Store_Choice::CART_STORE_COOKIE`) and the posted marker field
-  `rwpo_store_choice` (`Store_Choice::MARKER`). The option `rcus_store_choice`
+  (`Store_Choice::CART_STORE_COOKIE`), the posted marker field
+  `rwpo_store_choice` (`Store_Choice::MARKER`) and the class
+  `rwpo-sale-price` (`Cart_Sale_Price::WRAPPER`), which the mini cart a tab
+  stored before the switch carries. The option `rcus_store_choice`
   is that same string renamed, so a blind rename pass gets the marker wrong.
   `Install::LEGACY_PREFIX` (`rwpo_`) and `Plugin::LEGACY_CONSTANT`
   (`RWPO_VERSION`) keep it too, because they name WP Optimizer itself. Never
-  rename any of the five, and never give a new key the `rwpo` prefix.
+  rename any of the six, and never give a new key the `rwpo` prefix.
   `KeptKeysTest` pins them with the old prefix built in two pieces, so a
   rename pass cannot rewrite the expectation along with the code. Everything
   else of WP Optimizer's was renamed, `rcus_stores` (`Size_Stores::KEY`)
@@ -463,7 +465,7 @@ over, and both go once no shop runs WP Optimizer:
 - A switch moved between this plugin and the Optimizer later needs its own
   hand-over: the copy reads only `rwpo_`.
 
-The three kept keys stay when the rest goes: they are this plugin's own names
+The four kept keys stay when the rest goes: they are this plugin's own names
 now (see Prefixes).
 
 ## What not to do

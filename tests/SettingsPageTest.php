@@ -153,6 +153,7 @@ final class SettingsPageTest extends TestCase {
 		$checkboxes = substr_count( $html, 'type="checkbox"' );
 
 		$this->assertSame( 11, $checkboxes, 'One switch per feature that can apply, plus the master switch: not WeLaunch\'s seven, nor the Fintoc one on a site without them.' );
+		$this->assertStringNotContainsString( 'type="number"', $html, 'The revision limit belongs to wp-config.php, which always wins.' );
 		$this->assertSame( $checkboxes, substr_count( $html, 'type="checkbox" role="switch" class="rcus-switch"' ) );
 		$this->assertStringContainsString( '<label class="rcus-row__label" for="rcus_enabled">Enable</label>', $html );
 		$this->assertStringContainsString( 'aria-describedby="rcus_enabled-desc"', $html );

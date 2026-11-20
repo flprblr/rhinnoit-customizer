@@ -25,9 +25,9 @@ final class Install {
 	 * Written out rather than derived: it names what existed before, so it
 	 * must NOT follow a rename. Renamed to this plugin's own prefix, the copy
 	 * would read every option back into itself and carry nothing over.
-	 * Plugin::LEGACY_CONSTANT and the three keys Store_Choice and
-	 * Store_Stock_Hold read in place keep WP Optimizer's spelling for the same
-	 * reason.
+	 * Plugin::LEGACY_CONSTANT and the four keys Store_Choice, Store_Stock_Hold
+	 * and Cart_Sale_Price use in place keep WP Optimizer's spelling for the
+	 * same reason.
 	 */
 	const string LEGACY_PREFIX = 'rwpo_';
 

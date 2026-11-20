@@ -166,7 +166,7 @@ code of 2.8.13.
 | --- | --- | --- |
 | Skip the cart for virtual products | **off** | Goes straight to checkout when, after the add, every item in the cart is virtual. Decided with the real cart, so a physical product added from a virtual product's page or quick view keeps the cart page. |
 | Skip the cart for any product | **off** | Goes straight to checkout after any add, physical products included. |
-| Show the regular price struck through | on, by the owner's decision | Listings and the product page print a sale as the regular price struck through and the sale price; the mini cart, the cart and the checkout printed the sale price alone. Porto prints those lines through `woocommerce_cart_item_price` (mini cart, cart price column) and `woocommerce_cart_item_subtotal` (cart subtotal column, checkout), so at priority 20 the regular price, through the cart's tax display and for the line's quantity, goes before WooCommerce's own price HTML with `wc_format_sale_price()`: the product page's markup, screen-reader text and styles. Nothing changes when the regular price is not higher, when a `<del>` is already there, or when Porto's catalog mode has emptied the price (priority 100). Porto styles a struck price only inside `.price` or the cart table's cells, so the markup is wrapped in `span.rcus-sale-price` and an inline style with no file (every page: the mini cart is in the header) gives `del` Porto's own `.price del` look (`#a7a7a7`, `0.8em`) and lets both amounts inherit their `del`/`ins` color past Porto's mini cart `!important` gray; the red is the shop's own `ins` rule. Measured on hoka's live CSS: mini cart, cart and checkout then match the listing. |
+| Show the regular price struck through | on, by the owner's decision | Listings and the product page print a sale as the regular price struck through and the sale price; the mini cart, the cart and the checkout printed the sale price alone. Porto prints those lines through `woocommerce_cart_item_price` (mini cart, cart price column) and `woocommerce_cart_item_subtotal` (cart subtotal column, checkout), so at priority 20 the regular price, through the cart's tax display and for the line's quantity, goes before WooCommerce's own price HTML with `wc_format_sale_price()`: the product page's markup, screen-reader text and styles. Nothing changes when the regular price is not higher, when a `<del>` is already there, or when Porto's catalog mode has emptied the price (priority 100). Porto styles a struck price only inside `.price` or the cart table's cells, so the markup is wrapped in `span.rwpo-sale-price` (WP Optimizer's class, kept: see *Keys that keep WP Optimizer's spelling*) and an inline style with no file (every page: the mini cart is in the header) gives `del` Porto's own `.price del` look (`#a7a7a7`, `0.8em`) and lets both amounts inherit their `del`/`ins` color past Porto's mini cart `!important` gray; the red is the shop's own `ins` rule. Measured on hoka's live CSS: mini cart, cart and checkout then match the listing. |
 | Split cart coupons by price | on | WooCommerce 8.8+. WooCommerce splits a fixed cart coupon evenly per unit (`WC_Discounts::apply_coupon_fixed_cart()`), capping each line at its price, so a cheap line can reach the order at 0: 10,000 off 179,990 shoes and 4,990 socks took 5,010 and 4,990 on hoka. Last on `woocommerce_coupon_get_items_to_apply`, which WooCommerce passes the items it is about to discount and itself, the coupon is split by each line's price (what earlier coupons left of it with "Calculate coupon discounts sequentially" on), in whole cents: floors, then the cents left to the largest remainders, so the lines add up to the coupon; a line takes at most what is left of it and the rest goes to the others by price. Shoes 9,730, socks 270. The split goes into WooCommerce's own table, the protected `WC_Discounts::$discounts`, and the filter returns no items, so WooCommerce's split has nothing left to do; the cart, both checkouts and an order whose coupons are applied, removed or recalculated in the admin all total through it. Orders already placed keep their totals. Percent and fixed product coupons are left alone. In the cart each share is sent through WooCommerce's legacy `woocommerce_coupon_get_discount_amount`, as WooCommerce sends its own; if a plugin changes any, WooCommerce splits the coupon its own way and the log says so once a day. Hidden where WooCommerce is older than 8.8 or the table is gone. |
 | Hide the coupon prompt | **off** | On a checkout where every item is virtual. Classic checkout only. |
 | Hide the login prompt | **off** | Same condition. Classic checkout only. |
@@ -239,28 +239,30 @@ page cache and hover prefetching only pay off with it on.
 ## Keys that keep WP Optimizer's spelling
 
 Everything of WP Optimizer's that this plugin took was renamed from `rwpo` to
-`rcus`, except three keys that pages and orders of WP Optimizer's time still
+`rcus`, except four keys that pages and orders of WP Optimizer's time still
 carry:
 
 | Key | What it is | Why it keeps the name |
 | --- | --- | --- |
 | `_rwpo_store_units_taken` | Order meta, `Store_Stock_Hold::UNITS_TAKEN` | Written on a failed order whose store units WeLaunch kept, by WP Optimizer 2.8.x and by this plugin alike, and read by every stock check. Renamed, the orders WP Optimizer marked would count against other shoppers again, and their own retries would be refused. It is order data, so `uninstall.php` never deletes it. |
 | `rwpo_cart_store` | Browser-session cookie, `Store_Choice::CART_STORE_COOKIE` | The server writes it on `woocommerce_set_cart_cookies`, and the script in pages cached or still open from before the switch reads it. |
+| `rwpo-sale-price` | Class, `Cart_Sale_Price::WRAPPER` | WooCommerce puts back the mini cart a tab stored before the switch on every page until the cart changes (at most 24 hours), and a page cached or still open from before it gets the new markup over AJAX. With one class, the old pages' rules and this plugin's style both. |
 | `rwpo_store_choice` | Posted marker field, `Store_Choice::MARKER` | Pages cached or still open from before the switch post it, and the server refuses a marked add that names no store. The option with the same name did rename, to `rcus_store_choice`, so a blind rename pass gets this one wrong. |
 
 Two more strings keep the old spelling because they name WP Optimizer itself:
 `Install::LEGACY_PREFIX` (`rwpo_`), where the settings copy reads from, and
 `Plugin::LEGACY_CONSTANT` (`RWPO_VERSION`), what the guard asks. Renamed to
 this plugin's own, the copy would read its own rows back and the guard would
-hold on every shop. `KeptKeysTest` pins all five with the old prefix built in
+hold on every shop. `KeptKeysTest` pins all six with the old prefix built in
 two pieces, so a rename pass cannot rewrite the expectation along with the
 code.
 
 `rcus_stores`, the stores `Size_Stores` puts in each size's data, did rename:
 it is never stored, and both of its readers are here. A page cached or still
-open from before the switch, on a product with more than 30 variations (whose
-sizes load through `wc-ajax=get_variation`), only loses the instant store list
-until WeLaunch answers.
+open from before the switch only loses the instant store list, until WeLaunch
+answers, for sizes it loads afterwards: on a product with more than 30
+variations (whose sizes load through `wc-ajax=get_variation`) and in Porto's
+quick view (rendered through `admin-ajax.php`).
 
 ## Stripped from the template
 
@@ -435,7 +437,7 @@ every copy.
 - **Options**: always prefixed with `rcus_` and declared in
   `Settings::fields()`, which is where the activation defaults come from. Add
   them to `uninstall.php` too.
-- **Kept keys**: three keys keep WP Optimizer's `rwpo` spelling, and never
+- **Kept keys**: four keys keep WP Optimizer's `rwpo` spelling, and never
   follow a rename (see *Keys that keep WP Optimizer's spelling*).
 - **Escaping**: sanitize on input, escape on output (`esc_html`, `esc_attr`,
   `esc_url`, `wp_kses_post`).
@@ -714,11 +716,15 @@ Optimizer, in this order:
    but a notice ("Customizer waits until WP Optimizer is deactivated, and does
    nothing until then"), so the shop never gets a feature twice.
 2. **Deactivate** WP Optimizer straight away. From the next request the two
-   take over. WP Optimizer's own clear on deactivation runs; on Kinsta it is
+   take over. WP Optimizer's own clear on deactivation may not happen: on
+   cPanel, within 30 seconds of its last clear, it is deferred to a scheduled
+   event that nothing runs once WP Optimizer is inactive, and on Kinsta it is
    not forced.
-3. On Kinsta, **save the Optimizer's screen** once: that forces a purge and
-   runs the 5-minute check. A save of this screen does the same, through the
-   same group hook.
+3. **Save the Optimizer's screen** once, on any host, with **Clear the cache
+   after changes** on: a save clears at once, past the spacing, and on Kinsta
+   forces a purge and runs the 5-minute check. A save of this screen does the
+   same, through the same group hook. With that switch off, nothing clears:
+   purge the host's cache by hand.
 4. **Delete** WP Optimizer later, from the admin. Its uninstaller removes its
    own `rwpo_*` options; the copies here carry another prefix, and this
    plugin's uninstaller never touches WP Optimizer's rows.
@@ -727,8 +733,12 @@ Never delete WP Optimizer first: its `uninstall.php` deletes every `rwpo_`
 row, so nothing would be left to copy and this plugin would start from its
 defaults. Settings changed in WP Optimizer after step 1 are not carried over:
 the copy runs on activation and on each version change, and never overwrites
-a row that already exists here. Pages cached before the switch stay
-consistent, because the three keys they post and read kept their spelling.
+a row that already exists here. Pages cached or still open from before the
+switch keep working: the four keys they post and read kept their spelling.
+What such a page loads over AJAX afterwards comes from this plugin, so the
+size data in Porto's quick view and on products with more than 30 variations
+carries `rcus_stores`, which their old script does not read: the stores show
+when WeLaunch answers. Step 3's save leaves only tabs still open.
 
 What changes around the shop:
 
@@ -737,13 +747,13 @@ What changes around the shop:
 - **Handles, classes and codes** renamed from `rwpo` to `rcus`: the style
   handles `rcus-cart-sale-price` and `rcus-widget-sale-price` (and so the ids
   WordPress prints on their inline styles, `rcus-cart-sale-price-inline-css`
-  and `rcus-widget-sale-price-inline-css`), the classes `rcus-sale-price`,
-  `rcus-commune-select` and `rcus-store-choice`, the error code
+  and `rcus-widget-sale-price-inline-css`), the classes `rcus-commune-select`
+  and `rcus-store-choice`, the error code
   `rcus-store-held`, and `rcus_stores` in each size's data. Custom CSS, or a
   JS-delay or cache exclusion, keyed on the `rwpo-` names must follow.
 - **Log entries** go under the source `rhinnoit-customizer` from now on; the
   older ones stay under `rhinnoit-wp-optimizer`.
 
 The guard, its notice and the copy go once no shop runs WP Optimizer. The
-three kept keys stay: they are this plugin's own names now, and renaming one
+four kept keys stay: they are this plugin's own names now, and renaming one
 later would break the same things.

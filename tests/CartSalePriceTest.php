@@ -95,7 +95,7 @@ final class CartSalePriceTest extends TestCase {
 		$price = wc_price( 74990 );
 		$html  = ( new Cart_Sale_Price() )->strike_unit_price( $price, self::line() );
 
-		$this->assertStringStartsWith( '<span class="rcus-sale-price"><del aria-hidden="true">' . wc_price( 149990 ) . '</del> ', $html );
+		$this->assertStringStartsWith( '<span class="rwpo-sale-price"><del aria-hidden="true">' . wc_price( 149990 ) . '</del> ', $html );
 		$this->assertStringEndsWith( '</span></span>', $html, 'The wrapper closes after WooCommerce\'s own markup.' );
 		$this->assertStringContainsString( '<ins aria-hidden="true">' . $price . '</ins>', $html );
 		$this->assertMatchesRegularExpression( '/<span class="screen-reader-text">Original price was: \S*149\.990\.<\/span>/', $html, 'Screen readers hear the regular price.' );
@@ -110,7 +110,7 @@ final class CartSalePriceTest extends TestCase {
 		$subtotal = wc_price( 149980 );
 		$html     = ( new Cart_Sale_Price() )->strike_line_subtotal( $subtotal, self::line( 2 ) );
 
-		$this->assertStringStartsWith( '<span class="rcus-sale-price"><del aria-hidden="true">' . wc_price( 299980 ) . '</del> ', $html );
+		$this->assertStringStartsWith( '<span class="rwpo-sale-price"><del aria-hidden="true">' . wc_price( 299980 ) . '</del> ', $html );
 		$this->assertStringContainsString( '<ins aria-hidden="true">' . $subtotal . '</ins>', $html );
 	}
 
@@ -125,12 +125,12 @@ final class CartSalePriceTest extends TestCase {
 
 		$html = ( new Cart_Sale_Price() )->strike_unit_price( wc_price( 63017 ), self::line( 1, '126042', '63017' ) );
 
-		$this->assertStringStartsWith( '<span class="rcus-sale-price"><del aria-hidden="true">' . wc_price( 126042 ) . '</del> ', $html );
+		$this->assertStringStartsWith( '<span class="rwpo-sale-price"><del aria-hidden="true">' . wc_price( 126042 ) . '</del> ', $html );
 
 		WP_Stub::$wc->cart->incl_tax = true;
 		$html                        = ( new Cart_Sale_Price() )->strike_unit_price( wc_price( 74990 ), self::line( 1, '126042', '63017' ) );
 
-		$this->assertStringStartsWith( '<span class="rcus-sale-price"><del aria-hidden="true">' . wc_price( 149990 ) . '</del> ', $html, 'With tax, the regular price is shown with tax too.' );
+		$this->assertStringStartsWith( '<span class="rwpo-sale-price"><del aria-hidden="true">' . wc_price( 149990 ) . '</del> ', $html, 'With tax, the regular price is shown with tax too.' );
 	}
 
 	/**
@@ -150,7 +150,7 @@ final class CartSalePriceTest extends TestCase {
 		$css = WP_Stub::$inline_styles['rcus-cart-sale-price'];
 
 		foreach ( preg_split( '/}/', $css, -1, PREG_SPLIT_NO_EMPTY ) as $rule ) {
-			$this->assertMatchesRegularExpression( '/^(:where\()?\.rcus-sale-price /', $rule, 'Nothing outside the wrapper is restyled.' );
+			$this->assertMatchesRegularExpression( '/^(:where\()?\.rwpo-sale-price /', $rule, 'Nothing outside the wrapper is restyled.' );
 		}
 
 		$this->assertStringContainsString( 'color:#a7a7a7;font-size:.8em', $css );

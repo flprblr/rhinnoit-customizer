@@ -2,14 +2,15 @@
 /**
  * The names WP Optimizer wrote and defines keep its spelling here.
  *
- * WP Optimizer 2.8 wrote three keys on every shop this plugin replaces it on:
+ * WP Optimizer 2.8 wrote four keys on every shop this plugin replaces it on:
  * pages it cached, or that are still open, post the marker and read the
- * cart's store cookie, and the failed orders it marked carry the meta. Each
+ * cart's store cookie, the mini cart a tab stored carries the sale price's
+ * class, and the failed orders it marked carry the meta. Each
  * is read in place, never copied, so the code has to spell them as it did.
  * The hand-over names WP Optimizer twice more: the copy reads its options
  * under its prefix, and the guard asks for the constant it defines while it
- * is active. The cases of Store_Choice, Store_Stock_Hold, Install and Plugin
- * assert them too, but a rename pass over the identity would rewrite those
+ * is active. The cases of Store_Choice, Store_Stock_Hold, Cart_Sale_Price, Install
+ * and Plugin assert them too, but a rename pass over the identity would rewrite those
  * along with the code and stay green; this one builds the old prefix so that
  * no such pass can.
  *
@@ -18,6 +19,7 @@
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use RhinnoIT\Customizer\Frontend\Cart_Sale_Price;
 use RhinnoIT\Customizer\Frontend\Store_Choice;
 use RhinnoIT\Customizer\Frontend\Store_Stock_Hold;
 use RhinnoIT\Customizer\Install;
@@ -25,8 +27,9 @@ use RhinnoIT\Customizer\Plugin;
 use RhinnoIT\Customizer\Settings;
 
 /**
- * Covers the five names that keep WP Optimizer's spelling: three keys, the copy's prefix and the guard's constant.
+ * Covers the six names that keep WP Optimizer's spelling: four keys, the copy's prefix and the guard's constant.
  */
+#[CoversClass( Cart_Sale_Price::class )]
 #[CoversClass( Store_Choice::class )]
 #[CoversClass( Store_Stock_Hold::class )]
 #[CoversClass( Install::class )]
@@ -39,13 +42,14 @@ final class KeptKeysTest extends TestCase {
 	const string LEGACY = 'rw' . 'po';
 
 	/**
-	 * The marker, the cookie and the order meta are WP Optimizer's own.
+	 * The marker, the cookie, the sale price's class and the order meta are WP Optimizer's own.
 	 *
 	 * @return void
 	 */
 	public function test_the_keys_older_pages_and_orders_carry_keep_their_spelling(): void {
 		$this->assertSame( self::LEGACY . '_store_choice', Store_Choice::MARKER, 'Pages cached or open from before the switch post it; renamed, an add from one with no store ticked would go in under WeLaunch\'s cookie store.' );
 		$this->assertSame( self::LEGACY . '_cart_store', Store_Choice::CART_STORE_COOKIE, 'The script on those pages reads it to tick home delivery.' );
+		$this->assertSame( self::LEGACY . '-sale-price', Cart_Sale_Price::WRAPPER, 'A mini cart stored or cached before the switch carries it; renamed, its struck price loses the style on every page until the cart changes.' );
 		$this->assertSame( '_' . self::LEGACY . '_store_units_taken', Store_Stock_Hold::UNITS_TAKEN, 'Renamed, the failed orders WP Optimizer marked would hold their units against other shoppers again, and refuse their own retries.' );
 	}
 
