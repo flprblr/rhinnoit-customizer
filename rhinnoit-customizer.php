@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:          RHINNO IT - Customizer
- * Description:          Base template for private WordPress plugins, with a WooCommerce half when WooCommerce is active.
+ * Description:          Functional changes to how a WooCommerce shop behaves: cart, checkout, orders and stores.
  * Version:              1.0.0
  * Requires at least:    6.5
  * Requires PHP:         8.3

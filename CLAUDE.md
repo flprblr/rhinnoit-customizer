@@ -1,8 +1,19 @@
 # Plugin conventions
 
-Private WordPress plugin by RHINNO IT, based on `rhinnoit-customizer`. It runs on
-any WordPress site and adds a second half when WooCommerce is active. It is
-never published on wordpress.org. Read this before writing code.
+Private WordPress plugin by RHINNO IT, based on `wp-plugin-template`: its first
+commit is the template at `634cb2b`, the fork point of every resync. It changes
+how a WooCommerce shop behaves - its cart, checkout, orders and stores - and
+does nothing without WooCommerce. It is never published on wordpress.org. Read
+this before writing code.
+
+Its features come from RHINNO IT - WP Optimizer 2.8.13
+(`rhinnoit-wp-optimizer`, prefixes `RWPO_` / `rwpo_`, namespace
+`RhinnoIT\WpOptimizer`), which was split in two: this plugin took the cart,
+checkout, order and store features, and RHINNO IT - Optimizer the delivery and
+page cache ones. Each feature file is WP Optimizer's, byte for byte, with the
+identity renamed and two kinds of hand edit: the copies of the WooCommerce
+names the Optimizer also holds (see Layout), and the keys that keep WP
+Optimizer's spelling on purpose (see Prefixes).
 
 Everything in this repository is written in English: code, comments, docblocks,
 UI strings and documentation.
@@ -11,8 +22,18 @@ UI strings and documentation.
 
 - PHP 8.3 or higher (`Requires PHP` in the header, `testVersion` in
   `phpcs.xml.dist`, `"php"` in `composer.json`).
-- WordPress 6.5+. WooCommerce is optional; its half needs 8.0+
-  (`Plugin::MIN_WC_VERSION`). There is no `Requires Plugins` header, on purpose.
+- WordPress 6.5+ and WooCommerce 8.0+ (`Plugin::MIN_WC_VERSION`). There is no
+  `Requires Plugins` header, on purpose: the plugin activates on any site, and
+  without a supported WooCommerce it registers no service.
+- The plugin goes on every client, on any host and theme, with its defaults
+  (owner's decision, 2026-10-16). The measured shops run Porto on Kinsta or on
+  cPanel, and those are the cases the features are tuned for; anything else
+  must fail soft. There are no per-host profiles: one set of defaults serves
+  every site. What really depends on the theme or another plugin is decided by
+  the plugin from what it can read - Porto from `get_template()`, WeLaunch
+  Multi Inventory from its bootstrap function, Fintoc from its constant - and
+  a switch that cannot act there is not offered, never by asking the admin to
+  pick a profile.
 
 ## Layout
 
@@ -24,29 +45,47 @@ UI strings and documentation.
   (`includes/autoload.php`) relies on that mapping; do not use Composer to
   autoload the plugin code.
 - The two halves are two places. The WordPress half lives at the top of
-  `includes/` and runs on every site, so it touches WooCommerce only behind a
-  guard: `Plugin::woocommerce_is_active()`, `function_exists()` /
-  `class_exists()`, or ids that only exist where WooCommerce is supported. The
-  shell's own cases are `Assets::scope_matches()` and `is_plain_page()`,
-  `Logger::log()` and `Plugin::declare_woocommerce_compatibility()`. The
-  WooCommerce half lives in `includes/frontend/` under `...\Frontend`, and
-  `Plugin::__construct()` registers it only when
-  `Plugin::woocommerce_is_supported()` is true - the branch that ships empty in
-  the template. A service whose job needs WooCommerce (it asks `is_product()`
-  unguarded, or touches the cart) belongs in `Frontend`, whatever else it does.
+  `includes/` and runs on every site; here it is the shell alone (`Assets`,
+  `Install`, `Logger`, `Settings` and the admin classes), and it touches
+  WooCommerce only behind a guard: `Plugin::woocommerce_is_active()`,
+  `function_exists()` / `class_exists()`, or ids that only exist where
+  WooCommerce is supported. The shell's own cases are `Logger::log()`,
+  `Plugin::declare_woocommerce_compatibility()` and `Settings::conditions()`,
+  which asks `Coupon_Split` only behind the WooCommerce answer. Every service
+  of this plugin needs WooCommerce, so all of them live in `includes/frontend/`
+  under `...\Frontend` (`Widget_Thumbnail`, `Widget_Sale_Price`,
+  `Express_Checkout`, `Checkout_Focus`, `Commune_Select`, `Cart_Sale_Price`,
+  `Coupon_Split`, `Inventory_Links`, `Quick_View_Store`, `Size_Stores`,
+  `Store_Choice`, `Pickup_Stores`, `Store_Stock_Hold`, `Unpaid_Orders`,
+  `Fintoc_Session_Expiry`, plus `Cart_State`, a helper two of them ask that is
+  never registered), and `Plugin::__construct()` registers them only when
+  `Plugin::woocommerce_is_supported()` is true. A new one goes there too,
+  whatever else it does.
+- They register in that order. The WeLaunch scripts go on WeLaunch's own
+  handle (`Inventory_Links::HANDLE`): `Inventory_Links`', `Quick_View_Store`'s
+  and `Size_Stores`' at priority 99 print in the order they register, and
+  `Store_Choice`'s at 100 ticks from the radios the `Size_Stores` script sets.
+  `BootWithWeLaunchTest` pins it.
 - Service classes are `final`, expose `register()` and hook **only** there. The
   logic goes in separate methods.
 - Every new service is instantiated in `Plugin::__construct()`. Do not add
   containers or service providers.
 - Every feature reads its own switch through `Settings::feature()`, which
   answers no for all of them while the master switch (**Enable**) is off, so
-  unchecking it stops the plugin's work everywhere and not just its script
-  tag. A switch is read once, in `register()`, never per callback. `Assets` is
-  the exception: it registers either way, because the admin bundle has to load
-  with the switch off, and `enqueue_frontend()` checks `Settings::is_enabled()`
-  itself.
+  unchecking it stops the plugin's work everywhere. A switch is read once, in
+  `register()`, never per callback. `Assets` is the exception: it registers
+  either way, because the admin bundle has to load with the switch off.
 - `Settings` is not a service: it is a static helper (field definition and
   option reading). The UI lives in `Admin\Settings_Page`.
+- Never name a class, constant or function of another plugin of the group,
+  RHINNO IT - Optimizer above all. PHP evaluates every class constant on the
+  first `new`, so one constant built from another plugin's class is a "Class
+  not found" fatal on every request of every shop, admin included. Copy the
+  value instead: `Inventory_Links::CART_COOKIE` and `SESSION_COOKIE` are
+  WooCommerce's names, which the Optimizer holds too, and
+  `Inventory_Links::CART_PAGES` is kept in step with the Optimizer's
+  `Shop_Prefetch::PAGES` by hand. What has to cross between the two goes
+  through the group hooks (see Interface), never through code.
 
 ## Naming
 
@@ -54,22 +93,37 @@ UI strings and documentation.
   `RHINNO IT - ` half is literal in the `Plugin Name:` header, so it survives
   the rename; only the part after it is a placeholder.
 - Directory and slug: `rhinnoit-<what-it-does>`, English, lowercase, hyphens.
-  The slug is also the text domain and the log source.
-  `bin/new-plugin.sh` forces the prefix on it.
+  The slug is also the text domain and the log source. The template's
+  `bin/new-plugin.sh` forced the prefix when this plugin was created; nothing
+  here re-checks it.
 - `RCUS_MENU_TITLE` carries the bare name, with no prefix: the shared node it
   hangs from already says RHINNO IT.
 - `tests/PackagingTest.php` checks the two halves it can see from inside the
   plugin: the header must carry the prefix, the menu entry must not. The
-  directory rule is enforced by `bin/new-plugin.sh`, not by a test.
+  directory rule has no test.
 
 ## Prefixes
 
 - Global constants: `RCUS_`
-- Options, transient keys, own hooks: `rcus_`. CSS classes and script
-  handles: `rcus-` (BEM inside the scope: `.rcus-settings .rcus-card__title`,
-  handle `rcus-frontend`). JS globals: `rcus` + PascalCase
-  (`window.rcusFrontend`). The two group hooks are the exception: see
-  Interface.
+- Options, transient keys, own hooks: `rcus_`. CSS classes and script and
+  style handles: `rcus-` (BEM inside the scope: `.rcus-settings
+  .rcus-card__title`, handle `rcus-cart-sale-price`). JS globals: `rcus` +
+  PascalCase, though there is none today: every inline script keeps to its
+  own closure. The two group hooks are the exception: see Interface.
+- Three keys keep WP Optimizer's `rwpo` spelling, because pages cached or
+  still open from before the switch, and orders WP Optimizer marked, carry
+  them: the order meta `_rwpo_store_units_taken`
+  (`Store_Stock_Hold::UNITS_TAKEN`), the cookie `rwpo_cart_store`
+  (`Store_Choice::CART_STORE_COOKIE`) and the posted marker field
+  `rwpo_store_choice` (`Store_Choice::MARKER`). The option `rcus_store_choice`
+  is that same string renamed, so a blind rename pass gets the marker wrong.
+  `Install::LEGACY_PREFIX` (`rwpo_`) and `Plugin::LEGACY_CONSTANT`
+  (`RWPO_VERSION`) keep it too, because they name WP Optimizer itself. Never
+  rename any of the five, and never give a new key the `rwpo` prefix.
+  `KeptKeysTest` pins them with the old prefix built in two pieces, so a
+  rename pass cannot rewrite the expectation along with the code. Everything
+  else of WP Optimizer's was renamed, `rcus_stores` (`Size_Stores::KEY`)
+  included: it is never stored, and both of its readers are here.
 - The admin page slug is the **plugin slug**, not the prefix: `?page=` says
   which plugin the screen is. `Menu::PAGE_SLUG` holds it, and comparisons use
   the constant - a literal would be renamed through the prefix instead and
@@ -103,7 +157,8 @@ UI strings and documentation.
   lint` runs the `WooCommerce-Core` ruleset and fails without them.
 - `composer analyse` runs PHPStan at level 8 and must stay clean. Add a new
   runtime constant to `phpstan-bootstrap.php` as well, or the analyser will not
-  find it.
+  find it, and so with a theme function a feature names as a callback:
+  `porto_image_srcset_filter_sizes()` is there for `Widget_Thumbnail`.
 - `composer test` runs PHPUnit with WordPress stubbed in `tests/bootstrap.php`.
   A fix for anything that could fatal on a storefront request gets a test that
   fails without the fix. Add new stubs to the bootstrap (WooCommerce ones to
@@ -112,7 +167,40 @@ UI strings and documentation.
   filename, so a second one in the same file is silently never run.
 - Behaviour gated on a constant needs a case in its own process, since the suite
   has already defined it. `WC_VERSION` comes from `RCUS_TESTS_WC` for that
-  reason, and the child inherits the environment the class sets.
+  reason (`7.9` below the minimum, `none` no WooCommerce, `8.7.1` a supported
+  one older than the coupon split's 8.8), and the child inherits the
+  environment the class sets.
+- `RCUS_TESTS_WELAUNCH=1` makes the bootstrap define
+  `welaunch_woocommerce_multi_inventory_run()`, for the cases that run with
+  WeLaunch Multi Inventory active (`InventoryLinksTest`, `QuickViewStoreTest`,
+  `SizeStoresTest`, `StoreChoiceTest`, `PickupStoresTest`,
+  `StoreStockHoldTest`, `BootWithWeLaunchTest`, `BootWithOldWooCommerceTest`,
+  `BootWithWpOptimizerTest`, `SettingsWithoutPortoTest`,
+  `QuickViewStoreWithoutPortoTest`, `HookArityTest`); the
+  `*WithoutWeLaunchTest` cases run in the shared process, where it is absent.
+  A feature built on WeLaunch asks for that function in `register()` and has a
+  case on each side. `RCUS_TESTS_WP_OPTIMIZER=1` defines WP Optimizer's
+  `RWPO_VERSION` (`BootWithWpOptimizerTest`), and `SettingsWithFintocTest`
+  defines Fintoc's `FINTOC_WC_VERSION` in its own process.
+- The Porto stubs live in `tests/stubs/porto.php`, loaded unless
+  `RCUS_TESTS_PORTO=none`. A feature built on a Porto function checks that the
+  function exists and steps aside otherwise, and has a case in its own process
+  proving it (`WidgetThumbnailWithoutPortoTest`,
+  `WidgetSalePriceWithoutPortoTest`, `QuickViewStoreWithoutPortoTest`,
+  `SettingsWithoutPortoTest`). Ask for a Porto function when the output is
+  printed, never in `register()`: plugins boot before the theme's
+  `functions.php`, so there it never exists. `get_template()` can be asked
+  anywhere.
+- `Widget_Thumbnail` edits Porto's `<img>` with core's `WP_HTML_Tag_Processor`,
+  using only what 6.5 already has (`next_tag()`, `get_attribute()`,
+  `set_attribute()`, `get_updated_html()`). The bootstrap loads core's HTML API
+  from `tests/stubs/html-api/` (7.1.2, unchanged) when it is missing, so its
+  cases run the real parser.
+- `Coupon_Split` writes its split into `WC_Discounts::$discounts`, because
+  WooCommerce has no hook for the split itself. Its cases run WooCommerce's own
+  `WC_Discounts` and `NumberUtil`, which the WooCommerce stubs load from
+  `tests/stubs/woocommerce-core/` (11.2.2, unchanged); `WP_Stub::$live_filters`
+  runs a callback where such a class calls one through a filter.
 - The WooCommerce stubs live in `tests/stubs/woocommerce.php`, which the
   bootstrap loads only when `WC_VERSION` is defined. A process started with
   `RCUS_TESTS_WC=none` therefore has no WooCommerce function or class at all,
@@ -121,7 +209,8 @@ UI strings and documentation.
   passing on a stub. Keep them there.
 - `tests/HookArityTest.php` registers every service and fails when a hooked
   method needs more arguments than its hook passes - an `ArgumentCountError` on
-  every request that fires it. A new service goes into its list.
+  every request that fires it. A new service goes into its list. It runs with
+  WeLaunch active, so the WeLaunch services hook too.
 - A filter that WordPress core feeds is tested with the value core really
   passes, read from core's source - not with the value it resolves to later. A
   case fed the resolved value passes while the feature does nothing on the
@@ -132,9 +221,10 @@ UI strings and documentation.
 
 They are declared once in `Settings::fields()`. From there come the default
 values (`Settings::defaults()`, on activation), the form
-(`Admin\Settings_Page`) and the list the uninstall guard checks
-(`Settings::option_ids()`). Adding an option means touching `fields()`, the list
-in `uninstall.php` and the catalogues in `languages/`, since its `title` and
+(`Admin\Settings_Page`), the list the uninstall guard checks
+(`Settings::option_ids()`) and the copy of WP Optimizer's values (see WP
+Optimizer, below). Adding an option means touching `fields()`, the list in
+`uninstall.php` and the catalogues in `languages/`, since its `title` and
 `desc` are strings (see Translations). A test fails if you skip the uninstall
 list, whether or not the field declares a `default`.
 `PluginTest::test_defaults_come_from_the_field_definition` and
@@ -145,63 +235,58 @@ lacks stays out of its count, and its message says it is left out.
 
 A default reaches only a fresh install and an option an update adds
 (`Install::seed_defaults()` uses `add_option()`): changing one never flips a
-site that already has the row, except a list whose row is not an array, which
-`Settings::chosen()` reads as the declared default (below) - a changed list
-default reaches that site too.
+site that already has the row.
 
-The list has three sections: the master switch alone in an untitled one, then
-WordPress, then WooCommerce - the platform before the addition. Every row of
-the WooCommerce section, its `title` and `sectionend` included, carries
-`'requires' => Settings::REQUIRES_WOOCOMMERCE`. `Settings::available_fields()`
-drops those rows on a site without a supported WooCommerce, and the form draws
-and saves that filtered list. Everything else reads the full list: an option
-still exists while its section is hidden, and gets back its value the day
-WooCommerce is installed. A test walks the list and fails when a row sits on
-the wrong side of the flag.
+The list has one section per domain, in this order: the master switch alone in
+an untitled one, then WooCommerce, Porto and WeLaunch Multi Inventory (owner's
+decision, 2026-10-06), each with its own groups. There is no WordPress
+section: nothing this plugin does works without WooCommerce. Every row of the
+last three, its `title` and `sectionend` included, carries `'requires'` with
+its section's mark: `Settings::REQUIRES_WOOCOMMERCE`, `REQUIRES_PORTO` (the
+theme's own WooCommerce markup: a supported WooCommerce and `get_template()` is
+`porto`, the same mark and the same answer as the Optimizer's) or
+`REQUIRES_MULTI_INVENTORY` (a supported WooCommerce and WeLaunch's
+`welaunch_woocommerce_multi_inventory_run()`). `Settings::available_fields()`
+drops a section whole on a site without what it needs, and the form draws and
+saves that filtered list. Everything else reads the full list: an option still
+exists while its section is hidden, and gets back its value the day the missing
+piece is installed. A feature that works on Porto's or WeLaunch's own output
+goes in their section, not in WooCommerce's.
+`PluginTest::test_each_conditional_section_is_marked_row_by_row` walks the list
+and fails when a row sits on the wrong side of a mark; a new conditional card
+adds its title id and mark to the map there.
 
 The screen offers only the options that can act on the site (owner's request,
 2026-10-16). An option that needs more than its section promises carries
 `'needs'`, a list of marks (`Settings::NEEDS_*`, or a section mark such as
-`REQUIRES_WOOCOMMERCE`), and `available_fields()` drops it where any is
-missing. Each mark is answered in `Settings::conditions()` from what is
-installed - a plugin's constant, the host, the theme's kind, a core function -
-and must be the same condition the feature itself stops at: hiding an option
-turns nothing off, and `Settings::feature()` still reads its row. Never a mark
-read from another plugin's settings: a switch must not come and go when
-someone changes a setting elsewhere. What depends on the host, the theme or
-another plugin is read this way, never asked: there is no profile for the
-admin to pick. A new mark goes into `conditions()` in the same change;
-`SettingsNeedsTest` fails on a mark it does not answer, since a typo would hide
-the option on every site. A card left with no option is not drawn at all. The
-rules live in `Settings::fields_for_marks()`, pure so the cases pin them with
-fields of their own; the template ships no `NEEDS_*` mark.
+`REQUIRES_PORTO`), and `available_fields()` drops it where any is missing. Each
+mark is answered in `Settings::conditions()` from what is installed - a
+plugin's constant, the theme, WooCommerce's version, the class a feature
+writes into - and must be the same condition the feature itself stops at:
+hiding an option turns nothing off, and `Settings::feature()` still reads its
+row. Never a mark read from another plugin's settings (Hold stock, the
+checkout block, WeLaunch's own options): a switch must not come and go when
+someone changes a setting elsewhere. What depends on the theme or another
+plugin is read this way, never asked: there is no profile for the admin to
+pick. Today's needs are `NEEDS_FINTOC` (`FINTOC_WC_VERSION`),
+`NEEDS_COUPON_ITEMS` (`Coupon_Split::can_split()`, imported by `Settings`) and
+`REQUIRES_PORTO` on the quick view switch. A new mark goes into `conditions()`
+in the same change as its first field; `SettingsNeedsTest` fails on a mark it
+does not answer, since a typo would hide the option on every site. Each plugin
+of the group declares and answers only its own marks: one built on another
+plugin's class is a fatal whenever the screen is drawn or saved. A card left
+with no option is not drawn at all. The rules live in
+`Settings::fields_for_marks()`, pure so the cases pin them with fields of their
+own.
 
-The master switch's declared default is what a row never saved means, for
-`Settings::is_enabled()` as for every `feature()`: the template ships it off,
-a plugin may ship it on, and the shell stays the same either way.
-
-An option that holds a list is read through a helper that filters it against the
-ids its own field can produce, before anything uses it - `Settings::chosen()`,
-which `frontend_contexts()` calls once per list. A row can hold anything: a
-non-array falls back to the field's declared default, because it cannot be
-filtered at all (`array_filter()` on a string is a `TypeError` on a storefront
-page), while an empty array is a real choice - it is what
-`Settings_Page::sanitize_submission()` stores when every box of a multicheck is
-unchecked. Filtering per field, not against the union, is what keeps an id one
-list could never have offered from surviving a crafted post. The WooCommerce
-list is read only where WooCommerce is supported: elsewhere it is a hidden
-section, and the conditional tags its ids map to may not exist.
-
-The scope lists ship empty, so a fresh install does nothing anywhere and only a
-deliberate choice turns it on. That also makes the cleanup observable: a list
-that comes back populated after a delete and reinstall means `uninstall.php`
-never ran, which a non-empty default would have hidden. `WP_Stub::reset()`
-therefore seeds a configured plugin, since the manifest cases need something to
-enqueue.
-
-The storefront contexts are two lists, `rcus_scope_wordpress` and
-`rcus_scope_woocommerce`, one per half: each sits in its own section, so the
-WooCommerce one hides with the rest of that half.
+Every switch ships `'default' => 'yes'` except the four that change the
+shopper's journey: both skip-the-cart switches and hiding the checkout's coupon
+and login prompts, which ship `'no'` (owner's decision, 2026-10-16: the plugin
+goes on every client with its defaults, and hidden switches keep it from doing
+anything where it cannot). The master switch ships `'yes'` too. Its declared
+default is what a row never saved means, for `Settings::is_enabled()` as for
+every `feature()`: the template ships it off, this plugin ships it on, and the
+shell stays the same either way.
 
 A row that is form structure rather than an option (`title`, `sectionend`)
 carries `'is_option' => false`. `Settings_Page::sanitize_submission()` checks
@@ -218,18 +303,20 @@ storefront never falls back to the defaults in between. The old row is kept for
 a rollback; `Settings::retired_option_ids()` feeds the uninstall list, which a
 test checks, and `Settings_Page::save()` refuses a form that still names a
 retired switch. A switch removed outright, with nothing to inherit it, goes into
-`Settings::REMOVED` for the same three reasons. Both ship empty in the
-template.
+`Settings::REMOVED` for the same three reasons. Both are empty: the plugin
+started at 1.0.0 with WP Optimizer's switches already split, and nothing has
+been retired since.
 
 Each `checkbox` says what it does in a few plain words (owner's request,
 2026-10-28): a `title` of a few words that starts with a verb, and a `desc` of
 one sentence saying what the owner or the shopper notices - no history,
 measurements or internals. The only caveats it keeps are the ones needed to
 decide: which pages to check where it can change a layout, and which switch it
-needs, named by that switch's title. A `multicheck` puts the verb in its
-`title` and lets each choice finish it (`Load the script on` ... `Cart`), and
-its `desc` may also say how the choices combine - which is why the WordPress
-scope list's runs to three sentences.
+needs, named by that switch's title.
+
+Do not add a switch that does nothing on the shops measured, however standard
+it is elsewhere, and measure again before relying on an old answer: check the
+live pages of the shops before adding one.
 
 Do not add a switch for anything `wp-config.php` sets (`WP_POST_REVISIONS`,
 `DISABLE_WP_CRON`, memory limits, debug): a constant there always wins, so the
@@ -241,8 +328,8 @@ switch could only be overruled or disagree with it.
   is one screen: the settings form (`Admin\Settings_Page`) and nothing else.
   Reports and diagnostics do not go there; they crowd the switches the screen
   exists for. `Admin\Menu` draws the heading; the form prints itself. No tabs -
-  the WordPress and WooCommerce halves are two cards of the one form, and a tab
-  bar would cost a click on every visit.
+  each domain is a card of the one form, and a tab bar would cost a click on
+  every visit.
 - `Menu::register_pages()` ends with `remove_submenu_page()`. Without it the
   node and the back-link core adds to it both 404: WordPress gives a top-level
   item the href of its first child, and the shared parent has no callback.
@@ -265,7 +352,9 @@ switch could only be overruled or disagree with it.
   the group fires the same two, so the one that clears the page cache (today
   the Optimizer) hears all of them; with no listener they do nothing. They are
   the group's contract, not example code. Like the menu constants they hold the
-  same value in every plugin, and `AdminTest` pins it.
+  same value in every plugin, and `AdminTest` pins it. This plugin fires both
+  and listens to neither: what it prints in cached pages stays fresh only
+  through the Optimizer.
 - Check permissions with `Menu::capability()`, never `Menu::CAPABILITY`
   directly. It answers `Menu::CAPABILITY` (`manage_woocommerce`, shared by the
   group) where WooCommerce is active and `Menu::FALLBACK_CAPABILITY`
@@ -285,12 +374,11 @@ switch could only be overruled or disagree with it.
   scoped under `.rcus-settings`: stay inside WordPress's own design language,
   no framework and no React app for a form of switches. Checkboxes are drawn
   as switches but stay real checkboxes with `role="switch"`, so the page works
-  the same without the stylesheet. It knows four types: `title`, `sectionend`,
-  `checkbox` and `multicheck` (one switch per choice, stored as one list).
-  Adding one means adding it to `Settings_Page::render_field()` and
-  `Settings_Page::sanitize_submission()` in the same change: a type one knows
-  and the other does not is either unsaveable or unsafe. The save reads only
-  the ids the field list declares, each through its own type's sanitizer,
+  the same without the stylesheet. It knows three types: `title`, `sectionend`
+  and `checkbox`. Adding one means adding it to `Settings_Page::render_field()`
+  and `Settings_Page::sanitize_submission()` in the same change: a type one
+  knows and the other does not is either unsaveable or unsafe. The save reads
+  only the ids the field list declares, each through its own type's sanitizer,
   never the keys of `$_POST`, and only the fields the form says it drew
   (`Settings_Page::DRAWN_FIELD`). A post that lists nothing it drew is refused
   like one from an older version: it would otherwise save nothing and say it
@@ -298,31 +386,31 @@ switch could only be overruled or disagree with it.
 
 ## Assets
 
-- Sources in `src/`, one entry point per context (`frontend`, `admin`).
-- The entry points are the shell: `src/frontend.js`, `src/frontend.scss`,
-  `src/admin.js` and `src/admin.scss` all exist even when empty, so writing a
-  feature never starts by wiring a bundle. Empty scaffolding is fine; an
-  example feature to delete is not.
+- Sources in `src/`, one entry point: `admin`, loaded only on the plugin page
+  (`Menu::is_current_page()`). `src/admin.js` and `src/admin.scss` are the
+  shell and stay even while the first is empty, so admin behaviour never
+  starts by wiring a bundle. Empty scaffolding is fine; an example feature to
+  delete is not.
+- The storefront has no bundle. What a feature prints there is inline, on a
+  handle already on the page: `wp_add_inline_script()` on WooCommerce's
+  `wc-checkout` or WeLaunch's `woocommerce-multi-inventory-public`
+  (`Inventory_Links::HANDLE`), and `wp_add_inline_style()` on WeLaunch's
+  stylesheet or on a file-less handle of the feature's own
+  (`wp_register_style( $handle, false )`). It costs no request and loads only
+  where what it extends loads. Add a `frontend` entry point only with a real
+  need for it, enqueued from `Assets` behind a switch, because anything it
+  loads costs every visitor; the template's storefront bundle is the one to
+  bring back.
 - Build with `npm run build`. `build/` is in `.gitignore`, so it has to be
   compiled before deploying (or drop that line if the deployment copies the
   repository as-is).
-- Enqueue only from `Assets`, through the helper that reads `build/*.asset.php`
-  (dependencies and version come from there; never hardcode them). That helper
-  validates the manifest and catches a `ParseError`: it runs on every storefront
-  request, so a half-uploaded build must degrade to "no script", never to a
+- Enqueue a built file only from `Assets`, through the helper that reads
+  `build/*.asset.php` (dependencies and version come from there; never
+  hardcode them). That helper validates the manifest and catches a
+  `ParseError`: a half-uploaded build must degrade to "no script", never to a
   fatal error.
 - Pass data to JS with `wp_add_inline_script` + `wp_json_encode`, not with
   `wp_localize_script` (it casts the values to string).
-- Load the scripts only on the screen where they are used. The storefront
-  contexts are two settings (`rcus_scope_wordpress` and
-  `rcus_scope_woocommerce`, merged by `Settings::frontend_contexts()`, which
-  reads the second only where WooCommerce is supported); the admin bundle keys
-  off `Menu::is_current_page()`. `Assets::is_plain_page()` asks no WooCommerce
-  tag on a site without WooCommerce: the "Pages" choice belongs to the
-  WordPress list and runs there too.
-- Declaring `jquery` as a dependency does not load a second copy: WordPress
-  deduplicates by handle. Keep it while the bundle listens to the WooCommerce
-  refresh events, which never reach a native listener.
 
 ## Never break the shop
 
@@ -352,21 +440,50 @@ reached from there has to fail soft:
   mode instead; swallowing errors only moves the breakage somewhere harder to
   find.
 
+## WP Optimizer
+
+Every shop this plugin goes on ran WP Optimizer first. Two pieces hand it
+over, and both go once no shop runs WP Optimizer:
+
+- `Plugin::boot()` boots nothing but a notice while WP Optimizer's constant
+  (`Plugin::LEGACY_CONSTANT`) is defined: that plugin runs the same features
+  under its own switches, and with both booted the shop would get each change
+  twice. It asks on `plugins_loaded`, never at file scope: WordPress loads the
+  active plugins in the order of their folder names, and this one comes
+  before `rhinnoit-wp-optimizer/`. The activation hook is not booted from
+  there, so the copy still runs beside WP Optimizer.
+- `Install::migrate_legacy_options()` copies the `rwpo_` row of each of
+  `Settings::option_ids()` with `add_option()`, first in `seed_defaults()`:
+  after the defaults, `add_option()` would keep them and the copy would do
+  nothing. It never overwrites and never deletes, and runs on activation and
+  on each version change.
+- `uninstall.php` never deletes an `rwpo_` row - WP Optimizer's own uninstaller
+  does, and deleting them here would reset WP Optimizer on a site that still
+  runs it - nor `_rwpo_store_units_taken`, which is order data.
+- A switch moved between this plugin and the Optimizer later needs its own
+  hand-over: the copy reads only `rwpo_`.
+
+The three kept keys stay when the rest goes: they are this plugin's own names
+now (see Prefixes).
+
 ## What not to do
 
 - Do not leave example features, empty hooks or unused options. An empty entry
   point in `src/` is the exception, and the only one: see Assets.
+- Do not key a feature to a product, a store id, a page id or a file name.
+  Rules are structural - the cart's own lines, the store WeLaunch names as
+  delivery or default, the queried product - so they hold when the shop's
+  content changes and nobody has to re-apply anything.
 - Do not add abstraction layers for a single use case.
 - Do not use `admin-ajax` when the REST API solves the case.
 - Do not query the database directly when a WordPress or WooCommerce API
   exists (`wp_load_alloptions()`, `wp_count_posts()`, `wc_get_orders`,
-  `wc_get_products`, `$order->get_meta()`).
+  `wc_get_products`, `$order->get_meta()`). The one exception is
+  `Store_Stock_Hold`'s read of `wc_reserved_stock`, as WooCommerce's own
+  `ReserveStock` reads it: there is no API listing those rows, and live rows
+  must not be cached.
 - Do not add `readme.txt` or wordpress.org directory headers: the plugin is
   private and carries `Update URI: false`.
-- Do not put anything a plugin needs later inside the "Creating a plugin from
-  this template" section of the README: that whole section gets deleted in the
-  copy, and deleting it is its own last step. Instructions for creating the
-  plugin go in; rules the plugin lives by go outside.
 
 ## Translations
 
@@ -378,9 +495,8 @@ so both catalogues are kept complete; they differ only in local vocabulary
 the README). `tests/TranslationsTest.php` fails if any of the three steps is
 skipped or a translation changes its placeholders; it reads the PHP and the
 bundle sources in `src/`, and refuses plurals and contexts (`_n()`, `_x()`)
-until it is taught to read them. The template ships the
-shell's own strings translated, and `bin/new-plugin.sh` renames the catalogues
-to the new slug and recompiles them.
+until it is taught to read them. A string that came from WP Optimizer keeps
+WP Optimizer's translations.
 
 ## Versioning
 

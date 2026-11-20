@@ -1,6 +1,6 @@
 {
 	"name": "rhinnoit/customizer",
-	"description": "Base template for private WordPress plugins, with a WooCommerce half when WooCommerce is active.",
+	"description": "Functional changes to how a WooCommerce shop behaves: cart, checkout, orders and stores.",
 	"type": "wordpress-plugin",
 	"license": "GPL-2.0-or-later",
 	"require": {
