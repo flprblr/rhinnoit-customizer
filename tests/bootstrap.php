@@ -130,14 +130,12 @@ final class WP_Stub {
 	 */
 	public static function reset(): void {
 		/*
-		 * A configured plugin: on, and loading on the WooCommerce pages. The
-		 * shipped defaults are empty on purpose - nothing loads until somebody
-		 * picks where - so the cases about manifests and enqueueing would have
-		 * nothing to enqueue without this.
+		 * A configured plugin: switched on. The master switch can ship off, and
+		 * every feature answers no while it is, so the cases about what the
+		 * plugin does would have nothing to test without this.
 		 */
 		self::$options = array(
-			'rcus_enabled'           => 'yes',
-			'rcus_scope_woocommerce' => array( 'shop', 'product', 'cart', 'checkout', 'account' ),
+			'rcus_enabled' => 'yes',
 		);
 		self::$transients = array();
 		self::$enqueued   = array();
@@ -301,8 +299,8 @@ function remove_submenu_page( $menu_slug, $submenu_slug ) {
 
 /*
  * The WooCommerce screens are WordPress pages too, and the shop is one whenever
- * its page is what got queried. Modelling that is the point: it is what the
- * exclusions in Assets::is_plain_page() exist for.
+ * its page is what got queried. Modelling that is the point: a bare is_page()
+ * is true on all of them, and a stub that said otherwise would hide it.
  */
 function is_page() { return in_array( WP_Stub::$page_type, array( 'page', 'shop', 'cart', 'checkout', 'account' ), true ); }
 /*
