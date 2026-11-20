@@ -1,10 +1,10 @@
 # Plugin conventions
 
 Private WordPress plugin by RHINNO IT, based on `wp-plugin-template`: its first
-commit is the template at `634cb2b`, the fork point of every resync. It changes
-how a WooCommerce shop behaves - its cart, checkout, orders and stores - and
-does nothing without WooCommerce. It is never published on wordpress.org. Read
-this before writing code.
+commit is the template at `634cb2b`, the fork point of every resync. It adjusts
+the WooCommerce cart, checkout, orders and store pickup, and does nothing
+without WooCommerce. It is never published on wordpress.org. Read this before
+writing code.
 
 Its features come from RHINNO IT - WP Optimizer 2.8.13
 (`rhinnoit-wp-optimizer`, prefixes `RWPO_` / `rwpo_`, namespace

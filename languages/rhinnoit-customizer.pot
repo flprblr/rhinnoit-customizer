@@ -12,7 +12,7 @@ msgid "RHINNO IT - Customizer"
 msgstr ""
 
 #. Description of the plugin
-msgid "Functional changes to how a WooCommerce shop behaves: cart, checkout, orders and stores."
+msgid "Adjusts the WooCommerce cart, checkout, orders and store pickup."
 msgstr ""
 
 #. Author of the plugin

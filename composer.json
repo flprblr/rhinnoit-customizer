@@ -1,6 +1,6 @@
 {
 	"name": "rhinnoit/customizer",
-	"description": "Functional changes to how a WooCommerce shop behaves: cart, checkout, orders and stores.",
+	"description": "Adjusts the WooCommerce cart, checkout, orders and store pickup.",
 	"type": "wordpress-plugin",
 	"license": "GPL-2.0-or-later",
 	"require": {

@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:          RHINNO IT - Customizer
- * Description:          Functional changes to how a WooCommerce shop behaves: cart, checkout, orders and stores.
+ * Description:          Adjusts the WooCommerce cart, checkout, orders and store pickup.
  * Version:              1.0.0
  * Requires at least:    6.5
  * Requires PHP:         8.3

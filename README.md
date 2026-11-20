@@ -1,9 +1,9 @@
 # Customizer
 
-Private WordPress plugin by RHINNO IT that changes how a WooCommerce shop
-behaves: its cart, checkout, orders and stores. Built from
-`wp-plugin-template`, which carries the structure already solved (bootstrap,
-settings, assets, i18n, linters), so only the functional part is written here.
+Private WordPress plugin by RHINNO IT that adjusts the WooCommerce cart,
+checkout, orders and store pickup. Built from `wp-plugin-template`, which
+carries the structure already solved (bootstrap, settings, assets, i18n,
+linters), so only the functional part is written here.
 
 Requires **PHP 8.3+**, WordPress 6.5+ and WooCommerce 8.0+. It activates on
 any site, but everything it does needs WooCommerce: without a supported one it
