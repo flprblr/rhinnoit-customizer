@@ -127,6 +127,14 @@ msgid "For an address in Chile, the classic checkout offers the chosen region's 
 msgstr "En una dirección de Chile, la página de pago clásica ofrece las comunas de la región elegida en un desplegable, como la región. Revisa la página de pago en un teléfono."
 
 #: includes/class-settings.php
+msgid "Check the RUT at checkout"
+msgstr "Validar el RUT en la página de pago"
+
+#: includes/class-settings.php
+msgid "If the classic checkout asks for a RUT, it is formatted as it is typed and an invalid one is refused, and a foreign customer can leave it out."
+msgstr "Si la página de pago clásica pide el RUT, se le da formato mientras se escribe y se rechaza uno inválido, y un cliente extranjero puede omitirlo."
+
+#: includes/class-settings.php
 msgid "Shipping methods by commune"
 msgstr "Métodos de envío por comuna"
 
@@ -239,6 +247,18 @@ msgid "The sale price in widgets uses the same color as on shop and category pag
 msgstr "El precio de oferta de los widgets usa el mismo color que en la tienda y las categorías."
 
 #: includes/class-settings.php
+msgid "Checkout"
+msgstr "Página de pago"
+
+#: includes/class-settings.php
+msgid "Match the birth date field"
+msgstr "Igualar el campo de fecha de nacimiento"
+
+#: includes/class-settings.php
+msgid "If the classic checkout asks for a birth date, its field looks like the others, with the calendar icon at its right. Check the checkout on a phone."
+msgstr "Si la página de pago clásica pide la fecha de nacimiento, su campo se ve como los demás, con el botón del calendario a la derecha. Revisa la página de pago en un teléfono."
+
+#: includes/class-settings.php
 msgid "WeLaunch Multi Inventory"
 msgstr "WeLaunch Multi Inventory"
 
@@ -313,6 +333,14 @@ msgstr "Elige una comuna…"
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
 msgstr "Elige primero la región"
+
+#: includes/frontend/class-rut-validation.php
+msgid "Please enter your RUT."
+msgstr "Por favor, escribe tu RUT."
+
+#: includes/frontend/class-rut-validation.php
+msgid "The RUT you entered is not valid. Please check it."
+msgstr "El RUT no es válido. Por favor, revísalo."
 
 #. translators: %s: a shipping zone and one of its methods, as "Zone: method".
 #: includes/frontend/class-shipping-block.php

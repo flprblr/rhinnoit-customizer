@@ -56,13 +56,13 @@ UI strings and documentation.
   behind the same answer and only once WooCommerce registered it. Every service
   of this plugin needs WooCommerce, so all of them live in `includes/frontend/`
   under `...\Frontend` (`Widget_Thumbnail`, `Widget_Sale_Price`,
-  `Express_Checkout`, `Checkout_Focus`, `Commune_Select`, `Cart_Sale_Price`,
-  `Coupon_Split`, `Shipping_Block`, `Shipping_Exclusion`, `Inventory_Links`,
-  `Quick_View_Store`, `Size_Stores`, `Store_Choice`, `Pickup_Stores`,
-  `Store_Stock_Hold`, `Unpaid_Orders`, `Fintoc_Session_Expiry`, plus two
-  helpers that are never registered: `Cart_State`, which two of them ask, and
-  `Shipping_Communes`, what the two shipping rules share), and
-  `Plugin::__construct()` registers them only when
+  `Birthdate_Style`, `Express_Checkout`, `Checkout_Focus`, `Commune_Select`,
+  `Rut_Validation`, `Cart_Sale_Price`, `Coupon_Split`, `Shipping_Block`,
+  `Shipping_Exclusion`, `Inventory_Links`, `Quick_View_Store`, `Size_Stores`,
+  `Store_Choice`, `Pickup_Stores`, `Store_Stock_Hold`, `Unpaid_Orders`,
+  `Fintoc_Session_Expiry`, plus two helpers that are never registered:
+  `Cart_State`, which two of them ask, and `Shipping_Communes`, what the two
+  shipping rules share), and `Plugin::__construct()` registers them only when
   `Plugin::woocommerce_is_supported()` is true. A new one goes there too,
   whatever else it does.
 - They register in that order. The WeLaunch scripts go on WeLaunch's own
@@ -199,7 +199,10 @@ UI strings and documentation.
   `SettingsWithoutPortoTest`). Ask for a Porto function when the output is
   printed, never in `register()`: plugins boot before the theme's
   `functions.php`, so there it never exists. `get_template()` can be asked
-  anywhere.
+  anywhere: a feature built on Porto's stylesheet rather than a function -
+  `Birthdate_Style`, on its input border's CSS variable - asks it in
+  `register()`, as `Quick_View_Store` does, which is the answer the Porto mark
+  gives, and has its case too (`BirthdateStyleWithoutPortoTest`).
 - `Widget_Thumbnail` edits Porto's `<img>` with core's `WP_HTML_Tag_Processor`,
   using only what 6.5 already has (`next_tag()`, `get_attribute()`,
   `set_attribute()`, `get_updated_html()`). The bootstrap loads core's HTML API
@@ -228,7 +231,8 @@ UI strings and documentation.
   `WP_Stub::$translations`, which stands for the translations the plugin loads
   on `init`. The services register on `plugins_loaded`, before that, so a
   translated text read in `register()` would print in English on every shop;
-  the shipping messages' cases fill it after registering to pin that.
+  the shipping messages' cases and the RUT messages' fill it after registering
+  to pin that.
 - `.github/workflows/ci.yml` runs all three plus the JS linters and the build.
 
 ## Options

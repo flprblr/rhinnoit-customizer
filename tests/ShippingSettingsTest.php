@@ -53,11 +53,11 @@ final class ShippingSettingsTest extends TestCase {
 		}
 
 		$ids   = array_keys( $rows );
-		$start = array_search( 'rcus_checkout_commune_select', $ids, true );
+		$start = array_search( 'rcus_rut_validation', $ids, true );
 
 		$this->assertSame(
 			array(
-				'rcus_checkout_commune_select',
+				'rcus_rut_validation',
 				'rcus_shipping_block',
 				'rcus_shipping_block_methods',
 				'rcus_shipping_block_communes',

@@ -10,6 +10,7 @@ namespace RhinnoIT\Customizer;
 use Automattic\WooCommerce\Utilities\FeaturesUtil;
 use RhinnoIT\Customizer\Admin\Menu;
 use RhinnoIT\Customizer\Admin\Plugin_Links;
+use RhinnoIT\Customizer\Frontend\Birthdate_Style;
 use RhinnoIT\Customizer\Frontend\Cart_Sale_Price;
 use RhinnoIT\Customizer\Frontend\Checkout_Focus;
 use RhinnoIT\Customizer\Frontend\Commune_Select;
@@ -19,6 +20,7 @@ use RhinnoIT\Customizer\Frontend\Fintoc_Session_Expiry;
 use RhinnoIT\Customizer\Frontend\Inventory_Links;
 use RhinnoIT\Customizer\Frontend\Pickup_Stores;
 use RhinnoIT\Customizer\Frontend\Quick_View_Store;
+use RhinnoIT\Customizer\Frontend\Rut_Validation;
 use RhinnoIT\Customizer\Frontend\Shipping_Block;
 use RhinnoIT\Customizer\Frontend\Shipping_Exclusion;
 use RhinnoIT\Customizer\Frontend\Size_Stores;
@@ -89,13 +91,13 @@ final class Plugin {
 	/**
 	 * Declares compatibility with the WooCommerce features.
 	 *
-	 * Blocks stay declared compatible although Checkout_Focus, Commune_Select
-	 * and Store_Stock_Hold act on the classic (shortcode) checkout only: on the
-	 * block checkout they do nothing, and they break nothing. Shipping_Block
-	 * and Shipping_Exclusion take their rates away on both, and print their
-	 * message and check the submit on the classic one only. Set
-	 * `cart_checkout_blocks` to false only for a service that would break the
-	 * block checkout.
+	 * Blocks stay declared compatible although Checkout_Focus, Commune_Select,
+	 * Rut_Validation, Birthdate_Style and Store_Stock_Hold act on the classic
+	 * (shortcode) checkout only: on the block checkout they do nothing, and
+	 * they break nothing. Shipping_Block and Shipping_Exclusion take their
+	 * rates away on both, and print their message and check the submit on the
+	 * classic one only. Set `cart_checkout_blocks` to false only for a service
+	 * that would break the block checkout.
 	 *
 	 * @return void
 	 */
@@ -128,9 +130,11 @@ final class Plugin {
 			// touches WooCommerce only behind a guard.
 			( new Widget_Thumbnail() )->register();
 			( new Widget_Sale_Price() )->register();
+			( new Birthdate_Style() )->register();
 			( new Express_Checkout() )->register();
 			( new Checkout_Focus() )->register();
 			( new Commune_Select() )->register();
+			( new Rut_Validation() )->register();
 			( new Cart_Sale_Price() )->register();
 			( new Coupon_Split() )->register();
 			( new Shipping_Block() )->register();

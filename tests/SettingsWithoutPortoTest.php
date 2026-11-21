@@ -52,6 +52,7 @@ final class SettingsWithoutPortoTest extends TestCase {
 		$this->assertNotContains( 'rcus_porto', $ids );
 		$this->assertNotContains( 'rcus_widget_thumb_srcset', $ids );
 		$this->assertNotContains( 'rcus_widget_sale_price', $ids );
+		$this->assertNotContains( 'rcus_birthdate_style', $ids );
 		$this->assertContains( 'rcus_woocommerce', $ids );
 		$this->assertContains( 'rcus_cart_sale_price', $ids );
 	}

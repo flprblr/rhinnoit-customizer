@@ -12,7 +12,9 @@
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Settings_Page;
+use RhinnoIT\Customizer\Frontend\Birthdate_Style;
 use RhinnoIT\Customizer\Frontend\Commune_Select;
+use RhinnoIT\Customizer\Frontend\Rut_Validation;
 use RhinnoIT\Customizer\Frontend\Widget_Sale_Price;
 use RhinnoIT\Customizer\Plugin;
 
@@ -61,6 +63,8 @@ final class BootTest extends TestCase {
 				'porto_lazy_load_images:add_srcset',
 				'woocommerce_add_to_cart_redirect:redirect_to_checkout',
 				'template_redirect:drop_the_prompts',
+				'woocommerce_checkout_fields:relax_field',
+				'woocommerce_after_checkout_validation:check_rut',
 				'woocommerce_cart_item_subtotal:strike_line_subtotal',
 				'woocommerce_coupon_get_items_to_apply:split',
 				'woocommerce_package_rates:hide_rates',
@@ -77,6 +81,8 @@ final class BootTest extends TestCase {
 		// BootWithWeLaunchTest, since the shared process has no WeLaunch.
 		$this->assertContains( array( 'wp_enqueue_scripts', Commune_Select::class, 'add_script', 1 ), WP_Stub::$registered );
 		$this->assertContains( array( 'wp_enqueue_scripts', Widget_Sale_Price::class, 'add_style', 1 ), WP_Stub::$registered );
+		$this->assertContains( array( 'wp_enqueue_scripts', Rut_Validation::class, 'add_script', 1 ), WP_Stub::$registered );
+		$this->assertContains( array( 'wp_enqueue_scripts', Birthdate_Style::class, 'add_style', 1 ), WP_Stub::$registered );
 
 		$this->assertNotContains( 'admin_notices', WP_Stub::$hooks, 'Nothing is wrong, so nothing is announced.' );
 	}

@@ -57,9 +57,11 @@ includes/
 ├── frontend/                   The WooCommerce half: every service
 │   ├── class-widget-thumbnail.php      A srcset for Porto's product widget thumbnails
 │   ├── class-widget-sale-price.php     The listing's sale color in Porto's product widgets
+│   ├── class-birthdate-style.php       The checkout's birth date field as tall as Porto's others
 │   ├── class-express-checkout.php      Skips the cart after an add
 │   ├── class-checkout-focus.php        Hides the checkout's coupon and login prompts
 │   ├── class-commune-select.php        Chile's communes as a dropdown on the checkout
+│   ├── class-rut-validation.php        Formats and checks the RUT on the checkout
 │   ├── class-cart-sale-price.php       Regular price struck through in the cart
 │   ├── class-coupon-split.php          Splits a fixed cart coupon by each line's price
 │   ├── class-shipping-block.php        Hides chosen shipping methods for chosen communes
@@ -174,6 +176,7 @@ code of 2.8.13.
 | Hide the coupon prompt | **off** | On a checkout where every item is virtual. Classic checkout only. |
 | Hide the login prompt | **off** | Same condition. Classic checkout only. |
 | Pick the commune from a list | on | Classic checkout only, for an address in Chile. WooCommerce draws the region as a dropdown and the commune (the city field) as free text, so one commune reached the orders spelt many ways. Once the country is Chile and every region the region dropdown offers is one of WooCommerce's 16 codes, a script printed after `wc-checkout` swaps the text box for a dropdown of that region's communes (`Commune_Select::COMMUNES`, 346 in all), enhanced by selectWoo like the region. It keeps the field's id, name and autocomplete, so the label, the Checkout Field Editor's settings and the order are unchanged: the order gets the commune's name. A saved value is picked when it names a commune of the region, ignoring case and accents, otherwise the shopper chooses; changing the region rebuilds the list and another country gives the text box back. A region dropdown with codes of its own (a plugin redefining Chile's regions: hoka's shipping zones still name `CL_RM` and others) keeps the text box, which an empty list would have made impossible to fill. Nothing is validated on the server, so without the script the text box stays. |
+| Check the RUT at checkout | on | Classic checkout only, and only where the checkout has a RUT field: `billing_rut`, with the Chilean/foreigner radio `billing_is_chilean` beside it, both added by another plugin; this one adds neither. What rhinnoit-validacion-rut-cl did, rebuilt. A foreigner has no RUT, so the requirement stops being WooCommerce's: at `woocommerce_checkout_fields` 20, after the plugin that adds the field, its `required` flag and its `validate-required` class (which WooCommerce's script checks) go, everything else that plugin set stays, and what the flag said stays on the input as `data-rcus-required`. The radio is read as the old plugin read it, accents and case aside: chilean, chilena, chileno, 1, true, si, or anything containing "chile" is a Chilean; foreigner, extranjero, extranjera, 0, false, no, or anything containing "extra" a foreigner. On the submit, `woocommerce_checkout_posted_data` empties a foreigner's RUT, and `woocommerce_after_checkout_validation` refuses a missing RUT - always of a Chilean, never of a foreigner, and with no choice or no radio as the field's own flag said - and one that is not valid, with the field's id, so WooCommerce links the notice to the field (11.2 also shows it under the field). Valid is `Rut_Validation::is_valid()`: stripped to digits and K (a lowercase k counts), 8 or 9 characters, a body of 7 or 8 digits that is neither all zeros nor eight repeated digits, and Chile's modulo 11 check digit (11 is 0, 10 is K). A script after `wc-checkout` formats the field as 12.345.678-9 while it is typed, the caret kept in place; checks it when it loses focus and on `checkout_place_order`, which it stops, ahead of any later handler, with the message under the field in WooCommerce's own inline error markup; disables and empties the field for a foreigner and gives it back for anyone else; shows the required mark while the RUT is required, since WooCommerce now draws the field as optional; and runs again on `updated_checkout`. An inline style with no file marks the field in error, whichever side found it (WooCommerce's red where its stylesheet loads, plain red on Porto, which styles no invalid field), and the field turned off. Without the script the server refuses what the script would. The old plugin's server stripped a lowercase k before upper-casing it, read its own relaxed flag when no choice was made, so the RUT was never required then, and counted a K in the body as a 0; none of that is kept. In a jsdom harness running WordPress's jQuery 3.7.1 and WooCommerce 11.2.2's own checkout script: the formatting, the caret, both messages, the stopped submit (a gateway handler bound later did not let it through), the foreigner's field turned off and back, one submit check after two updates, a checkout without the field left alone, and a server refusal shown once under the field. |
 | Hide shipping methods in some communes | on, inert until both lists hold something | For a same-day promise the courier keeps in a city's central communes only: what YNK Bloqueo Despacho Express por Comuna did with one instance id and 19 communes written in its code. **Shipping methods to hide** lists every method of every zone as *zone: method* (the zone for the locations no other zone covers last, a disabled method marked), stored by instance id, so renaming a method changes nothing and the same kind of method in another zone stays; **Communes where they are hidden** offers Chile's 346 communes under WooCommerce's names for the regions. For a package whose commune matches (see below), the chosen instances' rates are taken off `woocommerce_package_rates` at `PHP_INT_MAX`, after the couriers' plugins add theirs: the cart and both checkouts lose them. While a package's commune matches and its zone has one of the methods enabled, **Message for those communes** shows as its own row under the shipping options of the cart totals and the classic checkout's order review (`woocommerce_cart_totals_after_shipping`, `woocommerce_review_order_after_shipping`), once, escaped, its line breaks kept; an empty message shows nothing, and the methods still go. A hidden method still in the rates WooCommerce stored before the rule changed, and chosen, is refused at the classic checkout's submit (`woocommerce_after_checkout_validation`) with the message, or a sentence of the plugin's when the message is empty; a hidden method that is gone from the rates WooCommerce refuses itself. |
 | Stop deliveries to some communes | on, inert until its list holds something | For when the courier stops delivering somewhere, a disaster zone for instance: what regiones-excluidas-envio did with communes and a message written in its code, without its removal of store pickup. For a package whose commune is one of **Communes without delivery**, every rate but WooCommerce's pickup ones (method ids `local_pickup` and `pickup_location`) is taken off `woocommerce_package_rates` at `PHP_INT_MAX`, whatever zone or courier offers it, in the cart and both checkouts. With pickup left, **Message for those communes** shows as its own row under the shipping options, as above; with nothing left, it replaces WooCommerce's own "no shipping options" text in that package (`woocommerce_no_shipping_available_html` on the classic checkout, `woocommerce_cart_no_shipping_available_html` in the cart) and no row is printed, so it shows once. An empty message prints nothing and leaves WooCommerce's text. A delivery still in stored rates, and chosen, is refused at the classic checkout's submit as above. |
 | Cancel unpaid orders on time | on | WooCommerce looks for unpaid orders once per Hold stock period N and cancels checkout orders pending since their last update + N, so one can wait almost 2N. With N of 15 minutes or more, `woocommerce_cancel_unpaid_orders_interval_minutes` returns 2, which all three places that schedule WooCommerce's job read (after each run, the 03:00 Action Scheduler repair, a Products > Inventory save). Below 15 it steps aside: Webpay's window is about 9-10 minutes, and a payment confirmed after the cancellation reopens the order. On the classic checkout stock and coupons do not change: a pending order holds neither, and the reservation expires at N anyway; the block checkout counts a coupon as used from pending until the cancellation. What comes sooner is the Cancelled status, the admin email and the end of the Pay button. Replaces a must-use file that queried Action Scheduler on every uncached request, ran the cancellation twice and left a 5-minute recurring job that outlives it; that job stops once WooCommerce's own check runs first (this switch on with N of 15 or more) or on a Products > Inventory save. Nothing is scheduled here, so turning it off needs no cleanup. |
@@ -185,6 +188,7 @@ code of 2.8.13.
 | --- | --- | --- |
 | Show sharp thumbnails | on | Porto's `porto_widget_product_thumbnail()` (the products beside a product page, and any product widget) builds its `<img>` by hand from `wp_get_attachment_image_src( $id, 'widget-thumb-medium' )`: an 85-pixel square with no `srcset`, so a Retina screen or a phone stretches it and it looks blurred. The URL each `widget-thumb-medium` lookup returns is remembered with its attachment (`wp_get_attachment_image_src`, priority 999, after any URL rewriter, at most 200 per request), and where Porto passes the tag through `porto_lazy_load_images` (priority 5, before its own lazy load at 10) WordPress's own `wp_get_attachment_image_srcset()` and `sizes="85px"` are added. Porto trims every srcset on `wp_calculate_image_srcset` to copies from 320 px up to the box (`porto_image_srcset_filter_sizes`), which for an 85 px box leaves none, so that trim is taken off for this one call and put back at its own priority (2.7.11 added nothing because of it). Copies narrower than 1.5 times the box are left out: the 85-pixel one looked soft even on the owner's 1x monitor (the CDN serves it as a 664-byte WebP, shrunk to the 84 px box), so a 1x screen takes the 150 (1.4 KB in WebP) and shrinks it, and a Retina one the 400 (about 5 KB). Images not looked up here, or that already have a `srcset`, are left alone. Porto only, asked for when the tag is printed: plugins boot before the theme's `functions.php` (2.7.10 asked in `register()` and hooked nothing). |
 | Match the sale price color | on, by the owner's decision | Porto's `.product_list_widget .product-details .amount` gives every amount in its product widgets the theme's price color, so the sale price under `ins` lost the shop's own `ins` color (hoka's custom CSS: `#DC3545`) that the listings show. An inline style with no file, `.product_list_widget .product-details ins .woocommerce-Price-amount.amount{color:inherit}`, lets that amount take its `ins`'s color, and `:where(.product_list_widget .product-details ins){color:var(--porto-color-price)}` gives the `ins` a fallback that weighs nothing, so any `ins` rule of the shop's wins and a shop without one keeps Porto's price color. The struck price stays gray, and the mini cart keeps its own `!important` gray. Porto only, asked for when the style is added (see above). |
+| Match the birth date field | on | Porto only, classic checkout only, and only where the checkout has a birth date field: `billing_birthdate`, a date input another plugin adds. Porto 7.10's checkout stylesheet (`woopage.css`) gives the checkout's text, email, phone and password inputs a 30px line height, 48px tall with Porto's padding and border, and leaves the date input out, so the birth date field came out shorter than the fields around it. What rhinnoit-correccion-fecha-nacimiento did: an inline style with no file, on the checkout only, makes `#billing_birthdate[type="date"]` 48px tall, with Porto's input border (`--porto-input-bc`), 12px 16px of padding, the inherited font and no native look, and puts its calendar icon (`::-webkit-calendar-picker-indicator`) at its right, centered, inside the field's wrapper, which becomes the icon's positioning box. Asked through `get_template()` when the plugin boots, the same answer the Porto card's mark gives: off Porto the border color has no value, and the field would lose its border. |
 
 **WeLaunch Multi Inventory** - shown only with WooCommerce and WeLaunch Multi Inventory active:
 
@@ -616,8 +620,8 @@ gated on a constant needs the same treatment:
 - `tests/stubs/porto.php` is the slice of Porto the plugin touches;
   `RCUS_TESTS_PORTO=none` boots without it, which is how
   `WidgetThumbnailWithoutPortoTest`, `WidgetSalePriceWithoutPortoTest`,
-  `QuickViewStoreWithoutPortoTest` and `SettingsWithoutPortoTest` check a
-  theme that is not Porto.
+  `QuickViewStoreWithoutPortoTest`, `BirthdateStyleWithoutPortoTest` and
+  `SettingsWithoutPortoTest` check a theme that is not Porto.
 - `RCUS_TESTS_WP_OPTIMIZER=1` defines WP Optimizer's `RWPO_VERSION`, for
   `BootWithWpOptimizerTest`: the guard and the copy while WP Optimizer is
   still active.
@@ -653,6 +657,15 @@ WooCommerce 11.2's own. `__()` answers from `WP_Stub::$translations`, empty
 until a case fills it the way the plugin's translations load on `init`, after
 the services register: that is how the cases pin that a message is read when
 it is printed, not in `register()`.
+
+The RUT check's cases hand it the checkout fields, the posted data and the
+errors in the shapes WooCommerce 11.2's `WC_Checkout` passes them to
+`woocommerce_checkout_fields`, `woocommerce_checkout_posted_data` and
+`woocommerce_after_checkout_validation`. The bootstrap's `WP_Error` keeps the
+data an error carries, as core's does, because WooCommerce hands it to each
+notice: that is how the field's id on an error is checked. The script itself
+is a string the cases check only in part; its behavior was checked in a
+jsdom harness (see *What it does*).
 
 The suite is not decoration. Most of it covers a defect that reached a fatal
 error or a dead admin page before it was fixed; the rest pins a decision that
@@ -721,6 +734,9 @@ without WooCommerce, so those paths are hardened:
 | A plugin changes a coupon's share, or `WC_Discounts` starts no row for it | WooCommerce splits that coupon its own way, one log entry per day |
 | A shipping package names no city as text      | No commune matches; every rate stays       |
 | A shipping list changed outside the screen   | Stored rates keep the old rule until the shopper's cart or address changes; a save of the screen refreshes them |
+| The checkout has no RUT field                | The RUT check does nothing                 |
+| The RUT script blocked or broken             | The submit is left to the server, which refuses a missing or invalid RUT |
+| A crafted post sends the RUT or the radio as an array | Read as no RUT and no choice; no cast, no `TypeError` |
 | No WooCommerce to log to                     | Written to PHP's error log instead         |
 
 None of them raise a fatal error. The rule for anything reachable from a
@@ -752,7 +768,9 @@ extends does:
 | --- | --- | --- |
 | Show the regular price struck through | a style | its own file-less handle, `rcus-cart-sale-price`, on every page |
 | Match the sale price color | a style | its own file-less handle, `rcus-widget-sale-price`, on every Porto page |
+| Match the birth date field | a style | its own file-less handle, `rcus-birthdate-style`, on the checkout, on Porto |
 | Pick the commune from a list | a script | WooCommerce's `wc-checkout`, on the checkout |
+| Check the RUT at checkout | a script, and a style | WooCommerce's `wc-checkout`, and its own file-less handle, `rcus-rut-validation`, on the checkout |
 | Remove the store from links, Keep the quick view's store choice, Show each size's stores instantly, Let the shopper choose | scripts | WeLaunch's `woocommerce-multi-inventory-public`, at 99 and then 100 |
 | Hide stores without the size | a style | WeLaunch's `woocommerce-multi-inventory-public` stylesheet |
 
@@ -767,9 +785,10 @@ extends does:
   (`custom_order_tables`) and cart/checkout blocks. Set `cart_checkout_blocks`
   to `false` only for a feature that would break the block checkout; one that
   just does nothing there stays compatible, like the checkout prompts, the
-  commune list and the store stock hold, which act on the classic checkout
-  only. The two shipping rules take their rates away on both checkouts, and
-  print their message and check the submit on the classic one only.
+  commune list, the RUT check, the birth date field and the store stock hold,
+  which act on the classic checkout only. The two shipping rules take their
+  rates away on both checkouts, and print their message and check the submit
+  on the classic one only.
 - Errors go to **WooCommerce → Status → Logs** through `Logger`, under the
   source `rhinnoit-customizer`, or to PHP's error log on a site without
   WooCommerce.

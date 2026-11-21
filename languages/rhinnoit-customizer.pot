@@ -122,6 +122,14 @@ msgid "For an address in Chile, the classic checkout offers the chosen region's 
 msgstr ""
 
 #: includes/class-settings.php
+msgid "Check the RUT at checkout"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "If the classic checkout asks for a RUT, it is formatted as it is typed and an invalid one is refused, and a foreign customer can leave it out."
+msgstr ""
+
+#: includes/class-settings.php
 msgid "Shipping methods by commune"
 msgstr ""
 
@@ -234,6 +242,18 @@ msgid "The sale price in widgets uses the same color as on shop and category pag
 msgstr ""
 
 #: includes/class-settings.php
+msgid "Checkout"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Match the birth date field"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "If the classic checkout asks for a birth date, its field looks like the others, with the calendar icon at its right. Check the checkout on a phone."
+msgstr ""
+
+#: includes/class-settings.php
 msgid "WeLaunch Multi Inventory"
 msgstr ""
 
@@ -307,6 +327,14 @@ msgstr ""
 
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
+msgstr ""
+
+#: includes/frontend/class-rut-validation.php
+msgid "Please enter your RUT."
+msgstr ""
+
+#: includes/frontend/class-rut-validation.php
+msgid "The RUT you entered is not valid. Please check it."
 msgstr ""
 
 #. translators: %s: a shipping zone and one of its methods, as "Zone: method".

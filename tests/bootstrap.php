@@ -476,14 +476,17 @@ function wp_has_noncharacters( string $text ): bool {
 
 if ( ! class_exists( 'WP_Error' ) ) {
 	/**
-	 * Core's error collection: codes and messages.
+	 * Core's error collection: codes, messages, and the data a code carries.
 	 */
 	class WP_Error {
 		/** @var array<string, array<int, string>> */
 		public array $errors = array();
-		public function add( $code, $message, $data = '' ) { $this->errors[ (string) $code ][] = (string) $message; }
+		/** @var array<string, mixed> Data by code: the last added, as core keeps it, which WooCommerce hands each notice of that code. */
+		public array $error_data = array();
+		public function add( $code, $message, $data = '' ) { $this->errors[ (string) $code ][] = (string) $message; if ( ! empty( $data ) ) { $this->error_data[ (string) $code ] = $data; } }
 		public function get_error_messages( $code = '' ) { return '' === $code ? array_merge( array(), ...array_values( $this->errors ) ) : ( $this->errors[ $code ] ?? array() ); }
 		public function get_error_codes() { return array_keys( $this->errors ); }
+		public function get_error_data( $code = '' ) { $code = '' === $code ? (string) array_key_first( $this->errors ) : (string) $code; return $this->error_data[ $code ] ?? null; }
 	}
 }
 

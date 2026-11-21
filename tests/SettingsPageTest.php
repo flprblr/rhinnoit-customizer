@@ -152,7 +152,7 @@ final class SettingsPageTest extends TestCase {
 		$html       = $this->form();
 		$checkboxes = substr_count( $html, 'type="checkbox"' );
 
-		$this->assertSame( 13, $checkboxes, 'One switch per feature that can apply, plus the master switch: not WeLaunch\'s seven, nor the Fintoc one on a site without them.' );
+		$this->assertSame( 15, $checkboxes, 'One switch per feature that can apply, plus the master switch: not WeLaunch\'s seven, nor the Fintoc one on a site without them.' );
 		$this->assertStringNotContainsString( 'type="number"', $html, 'The revision limit belongs to wp-config.php, which always wins.' );
 		$this->assertSame( $checkboxes, substr_count( $html, 'type="checkbox" role="switch" class="rcus-switch"' ) );
 		$this->assertStringContainsString( '<label class="rcus-row__label" for="rcus_enabled">Enable</label>', $html );
@@ -170,14 +170,17 @@ final class SettingsPageTest extends TestCase {
 
 		$this->assertSame( 1, substr_count( $html, '<h3 class="rcus-card__group">Cart and checkout</h3>' ) );
 		$this->assertLessThan( strpos( $html, 'for="rcus_express_checkout"' ), strpos( $html, '>Cart and checkout</h3>' ) );
-		$this->assertGreaterThan( strpos( $html, 'for="rcus_checkout_commune_select"' ), strpos( $html, '>Shipping methods by commune</h3>' ) );
+		$this->assertGreaterThan( strpos( $html, 'for="rcus_rut_validation"' ), strpos( $html, '>Shipping methods by commune</h3>' ) );
+		$this->assertGreaterThan( strpos( $html, 'for="rcus_checkout_commune_select"' ), strpos( $html, 'for="rcus_rut_validation"' ), 'The RUT check closes Cart and checkout.' );
 		$this->assertLessThan( strpos( $html, 'for="rcus_shipping_block"' ), strpos( $html, '>Shipping methods by commune</h3>' ) );
 		$this->assertSame( 1, substr_count( $html, '>Shipping methods by commune</h3>' ), 'Above the switch, its two lists and its message, once.' );
 		$this->assertGreaterThan( strpos( $html, 'for="rcus_shipping_block_message"' ), strpos( $html, '>Deliveries by commune</h3>' ) );
 		$this->assertLessThan( strpos( $html, 'for="rcus_shipping_exclusion"' ), strpos( $html, '>Deliveries by commune</h3>' ) );
 		$this->assertGreaterThan( strpos( $html, 'for="rcus_shipping_exclusion_message"' ), strpos( $html, '>Orders</h3>' ) );
 		$this->assertLessThan( strpos( $html, 'for="rcus_widget_thumb_srcset"' ), strpos( $html, '>Product widgets</h3>' ) );
-		$this->assertSame( 5, substr_count( $html, '<h3 class="rcus-card__group">' ), 'Cart and checkout, the two shipping rules, Orders, then Porto\'s Product widgets, each once.' );
+		$this->assertGreaterThan( strpos( $html, 'for="rcus_widget_sale_price"' ), strpos( $html, '<h3 class="rcus-card__group">Checkout</h3>' ) );
+		$this->assertLessThan( strpos( $html, 'for="rcus_birthdate_style"' ), strpos( $html, '<h3 class="rcus-card__group">Checkout</h3>' ) );
+		$this->assertSame( 6, substr_count( $html, '<h3 class="rcus-card__group">' ), 'Cart and checkout, the two shipping rules, Orders, then Porto\'s Product widgets and Checkout, each once.' );
 	}
 
 	/**
