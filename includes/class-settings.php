@@ -7,7 +7,9 @@
 
 namespace RhinnoIT\Customizer;
 
+use RhinnoIT\Customizer\Frontend\Commune_Select;
 use RhinnoIT\Customizer\Frontend\Coupon_Split;
+use RhinnoIT\Customizer\Frontend\Shipping_Block;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -100,7 +102,8 @@ final class Settings {
 	 * 'options_callback' only the form calls, when it draws or saves the
 	 * screen; such a field declares an 'id_format' (DIGITS) for chosen() to
 	 * check ids by. 'placeholder' is what its empty box says. A 'textarea'
-	 * stores one text, read through text().
+	 * stores one text, read through text(); its default is a translated
+	 * sentence, which defaults() leaves out so it is never seeded.
 	 *
 	 * The structural rows carry 'is_option' => false, which is the flag
 	 * Settings_Page::sanitize_submission() checks. Without it a crafted post
@@ -110,6 +113,9 @@ final class Settings {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function fields(): array {
+		// Chile's communes by WooCommerce's region codes, each its own id: what both shipping rules choose from.
+		$communes = array_map( static fn ( array $names ): array => array_combine( $names, $names ), Commune_Select::COMMUNES );
+
 		return array(
 			array(
 				'id'        => self::OPTION_PREFIX . 'general',
@@ -198,6 +204,78 @@ final class Settings {
 				'title'    => __( 'Pick the commune from a list', 'rhinnoit-customizer' ),
 				'desc'     => __( 'For an address in Chile, the classic checkout offers the chosen region\'s communes in a dropdown, like the region. Check the checkout on a phone.', 'rhinnoit-customizer' ),
 				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'shipping_block',
+				'type'     => 'checkbox',
+				'group'    => __( 'Shipping methods by commune', 'rhinnoit-customizer' ),
+				'title'    => __( 'Hide shipping methods in some communes', 'rhinnoit-customizer' ),
+				'desc'     => __( 'For an address in the communes below, the shipping methods below are not offered, and the cart and the classic checkout show the message. Check both.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'               => self::OPTION_PREFIX . 'shipping_block_methods',
+				'type'             => 'multiselect',
+				'group'            => __( 'Shipping methods by commune', 'rhinnoit-customizer' ),
+				'title'            => __( 'Shipping methods to hide', 'rhinnoit-customizer' ),
+				'desc'             => __( 'Listed by shipping zone: pick a method in every zone it should disappear from.', 'rhinnoit-customizer' ),
+				'placeholder'      => __( 'Choose shipping methods…', 'rhinnoit-customizer' ),
+				'options_callback' => array( Shipping_Block::class, 'method_choices' ),
+				'id_format'        => self::DIGITS,
+				'default'          => array(),
+				'requires'         => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'           => self::OPTION_PREFIX . 'shipping_block_communes',
+				'type'         => 'multiselect',
+				'group'        => __( 'Shipping methods by commune', 'rhinnoit-customizer' ),
+				'title'        => __( 'Communes where they are hidden', 'rhinnoit-customizer' ),
+				'desc'         => __( 'Matched with the commune of the shipping address, whatever its accents or capitals.', 'rhinnoit-customizer' ),
+				'placeholder'  => __( 'Choose communes…', 'rhinnoit-customizer' ),
+				'options'      => $communes,
+				'group_labels' => array( Commune_Select::class, 'region_names' ),
+				'default'      => array(),
+				'requires'     => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'shipping_block_message',
+				'type'     => 'textarea',
+				'group'    => __( 'Shipping methods by commune', 'rhinnoit-customizer' ),
+				'title'    => __( 'Message for those communes', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Shown with the shipping options; leave it empty to show nothing.', 'rhinnoit-customizer' ),
+				'default'  => __( 'Express delivery is not available for your commune. Please choose another shipping method.', 'rhinnoit-customizer' ),
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'shipping_exclusion',
+				'type'     => 'checkbox',
+				'group'    => __( 'Deliveries by commune', 'rhinnoit-customizer' ),
+				'title'    => __( 'Stop deliveries to some communes', 'rhinnoit-customizer' ),
+				'desc'     => __( 'For an address in the communes below, only store pickup is offered, and the cart and the classic checkout show the message. Check both.', 'rhinnoit-customizer' ),
+				'default'  => 'yes',
+				'requires' => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'           => self::OPTION_PREFIX . 'shipping_exclusion_communes',
+				'type'         => 'multiselect',
+				'group'        => __( 'Deliveries by commune', 'rhinnoit-customizer' ),
+				'title'        => __( 'Communes without delivery', 'rhinnoit-customizer' ),
+				'desc'         => __( 'Matched with the commune of the shipping address, whatever its accents or capitals.', 'rhinnoit-customizer' ),
+				'placeholder'  => __( 'Choose communes…', 'rhinnoit-customizer' ),
+				'options'      => $communes,
+				'group_labels' => array( Commune_Select::class, 'region_names' ),
+				'default'      => array(),
+				'requires'     => self::REQUIRES_WOOCOMMERCE,
+			),
+			array(
+				'id'       => self::OPTION_PREFIX . 'shipping_exclusion_message',
+				'type'     => 'textarea',
+				'group'    => __( 'Deliveries by commune', 'rhinnoit-customizer' ),
+				'title'    => __( 'Message for those communes', 'rhinnoit-customizer' ),
+				'desc'     => __( 'Shown with the shipping options; leave it empty to show nothing.', 'rhinnoit-customizer' ),
+				'default'  => __( 'We cannot deliver to your commune for the time being. Please check your address, or contact us if you need help.', 'rhinnoit-customizer' ),
 				'requires' => self::REQUIRES_WOOCOMMERCE,
 			),
 			array(
@@ -617,7 +695,10 @@ final class Settings {
 	/**
 	 * One stored text, or its field's declared default while the row holds no string.
 	 *
-	 * Read it once per request, in register(). See text_from() for the rules.
+	 * Read it once per request, the first time it is printed rather than in
+	 * register(): the declared default is a translated sentence, and the
+	 * translations load on init, after the services register on
+	 * plugins_loaded. See text_from() for the rules.
 	 *
 	 * @param string $key Option key without the prefix.
 	 * @return string
@@ -668,7 +749,13 @@ final class Settings {
 	}
 
 	/**
-	 * Default values derived from the field definition.
+	 * Default values derived from the field definition: what activation seeds, and what a switch never saved reads as.
+	 *
+	 * A textarea's default is left out. It is a translated sentence, and this
+	 * is first built on plugins_loaded, before the translations load on init,
+	 * so seeded it would be written in English on every shop and stay so.
+	 * Unseeded, its row stays empty until the screen is saved, and text()
+	 * translates the default wherever it is printed.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -684,7 +771,7 @@ final class Settings {
 		$defaults = array();
 
 		foreach ( self::fields() as $field ) {
-			if ( isset( $field['id'], $field['default'] ) ) {
+			if ( isset( $field['id'], $field['default'] ) && 'textarea' !== ( $field['type'] ?? '' ) ) {
 				$defaults[ $field['id'] ] = $field['default'];
 			}
 		}

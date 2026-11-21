@@ -57,10 +57,12 @@ UI strings and documentation.
   of this plugin needs WooCommerce, so all of them live in `includes/frontend/`
   under `...\Frontend` (`Widget_Thumbnail`, `Widget_Sale_Price`,
   `Express_Checkout`, `Checkout_Focus`, `Commune_Select`, `Cart_Sale_Price`,
-  `Coupon_Split`, `Inventory_Links`, `Quick_View_Store`, `Size_Stores`,
-  `Store_Choice`, `Pickup_Stores`, `Store_Stock_Hold`, `Unpaid_Orders`,
-  `Fintoc_Session_Expiry`, plus `Cart_State`, a helper two of them ask that is
-  never registered), and `Plugin::__construct()` registers them only when
+  `Coupon_Split`, `Shipping_Block`, `Shipping_Exclusion`, `Inventory_Links`,
+  `Quick_View_Store`, `Size_Stores`, `Store_Choice`, `Pickup_Stores`,
+  `Store_Stock_Hold`, `Unpaid_Orders`, `Fintoc_Session_Expiry`, plus two
+  helpers that are never registered: `Cart_State`, which two of them ask, and
+  `Shipping_Communes`, what the two shipping rules share), and
+  `Plugin::__construct()` registers them only when
   `Plugin::woocommerce_is_supported()` is true. A new one goes there too,
   whatever else it does.
 - They register in that order. The WeLaunch scripts go on WeLaunch's own
@@ -153,9 +155,10 @@ UI strings and documentation.
   WooCommerce half), escape on output (`esc_html`, `esc_attr`, `esc_url`,
   `wp_kses_post`). Every dynamic value the admin screen prints has a case fed a
   value with markup in it: today that is the stored option values
-  (`SettingsPageTest`, and `SettingsFieldTypesTest` for lists and texts) and a
+  (`SettingsPageTest`, and `SettingsFieldTypesTest` for lists and texts), a
   multiselect's choices and group names from a callback
-  (`SettingsFieldTypesTest`). Print a new one and it needs its own.
+  (`SettingsFieldTypesTest`), and the shipping zones' names and their
+  methods' titles (`ShippingBlockTest`). Print a new one and it needs its own.
 - Nonce + `current_user_can()` on anything that writes.
 - Every visible string inside `__()` / `esc_html__()` with the plugin text
   domain.
@@ -221,6 +224,11 @@ UI strings and documentation.
   passes, read from core's source - not with the value it resolves to later. A
   case fed the resolved value passes while the feature does nothing on the
   shop.
+- `__()` hands every text back unchanged until a case fills
+  `WP_Stub::$translations`, which stands for the translations the plugin loads
+  on `init`. The services register on `plugins_loaded`, before that, so a
+  translated text read in `register()` would print in English on every shop;
+  the shipping messages' cases fill it after registering to pin that.
 - `.github/workflows/ci.yml` runs all three plus the JS linters and the build.
 
 ## Options
@@ -241,7 +249,13 @@ lacks stays out of its count, and its message says it is left out.
 
 A default reaches only a fresh install and an option an update adds
 (`Install::seed_defaults()` uses `add_option()`): changing one never flips a
-site that already has the row.
+site that already has the row. A `textarea`'s default is the exception: it is
+a translated sentence, and `Settings::defaults()` is first built on
+`plugins_loaded`, before the translations load, so seeded it would sit in the
+row in English on every shop. `defaults()` leaves it out, the row stays empty
+until the screen is saved, and `Settings::text()` translates the default
+wherever it is printed. Saving the screen stores what the box shows, in the
+admin's language.
 
 The list has one section per domain, in this order: the master switch alone in
 an untitled one, then WooCommerce, Porto and WeLaunch Multi Inventory (owner's
@@ -289,10 +303,12 @@ Every switch ships `'default' => 'yes'` except the four that change the
 shopper's journey: both skip-the-cart switches and hiding the checkout's coupon
 and login prompts, which ship `'no'` (owner's decision, 2026-10-16: the plugin
 goes on every client with its defaults, and hidden switches keep it from doing
-anything where it cannot). The master switch ships `'yes'` too. Its declared
-default is what a row never saved means, for `Settings::is_enabled()` as for
-every `feature()`: the template ships it off, this plugin ships it on, and the
-shell stays the same either way.
+anything where it cannot). The two shipping rules ship on with their lists
+empty, which leaves them inert until the owner picks what they act on. The
+master switch ships `'yes'` too. Its declared default is what a row never
+saved means, for `Settings::is_enabled()` as for every `feature()`: the
+template ships it off, this plugin ships it on, and the shell stays the same
+either way.
 
 A row that is form structure rather than an option (`title`, `sectionend`)
 carries `'is_option' => false`. `Settings_Page::sanitize_submission()` checks
@@ -300,8 +316,10 @@ that flag, and a test isolates it: without it a crafted post stores the section
 id as an option nothing reads.
 
 An option that holds a list - a `multiselect` - is read through
-`Settings::chosen()`, and one that holds a text - a `textarea` - through
-`Settings::text()`, each once, in `register()`. A row can hold anything.
+`Settings::chosen()`, once, in `register()`, and one that holds a text - a
+`textarea` - through `Settings::text()`, once, the first time it is printed
+(see the textarea default above: read in `register()`, a row never saved
+reads as English). A row can hold anything.
 `chosen()` reads a non-array as the field's declared default, because it
 cannot be filtered at all (`array_filter()` on a string is a `TypeError` on a
 storefront page), while an empty array is a real choice - it is what
@@ -377,8 +395,14 @@ switch could only be overruled or disagree with it.
   the group fires the same two, so the one that clears the page cache (today
   the Optimizer) hears all of them; with no listener they do nothing. They are
   the group's contract, not example code. Like the menu constants they hold the
-  same value in every plugin, and `AdminTest` pins it. This plugin fires both
-  and listens to neither: what it prints in cached pages stays fresh only
+  same value in every plugin, and `AdminTest` pins it. This plugin fires both,
+  and listens to `SAVED_HOOK` only to bump WooCommerce's shipping version
+  (`Shipping_Communes::refresh_rates()`, whatever the switches say), so the
+  rates each shopper's session stored follow the shipping rules at once. It
+  hooks it by `Shipping_Communes::SAVED`, the name written out and pinned to
+  `SAVED_HOOK` by a test, as the Optimizer's `Page_Cache` does: the services
+  register on every storefront request, and reading the constant would load
+  the admin class there. What it prints in cached pages stays fresh only
   through the Optimizer.
 - Check permissions with `Menu::capability()`, never `Menu::CAPABILITY`
   directly. It answers `Menu::CAPABILITY` (`manage_woocommerce`, shared by the

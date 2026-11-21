@@ -19,6 +19,8 @@ use RhinnoIT\Customizer\Frontend\Fintoc_Session_Expiry;
 use RhinnoIT\Customizer\Frontend\Inventory_Links;
 use RhinnoIT\Customizer\Frontend\Pickup_Stores;
 use RhinnoIT\Customizer\Frontend\Quick_View_Store;
+use RhinnoIT\Customizer\Frontend\Shipping_Block;
+use RhinnoIT\Customizer\Frontend\Shipping_Exclusion;
 use RhinnoIT\Customizer\Frontend\Size_Stores;
 use RhinnoIT\Customizer\Frontend\Store_Choice;
 use RhinnoIT\Customizer\Frontend\Store_Stock_Hold;
@@ -89,7 +91,9 @@ final class Plugin {
 	 *
 	 * Blocks stay declared compatible although Checkout_Focus, Commune_Select
 	 * and Store_Stock_Hold act on the classic (shortcode) checkout only: on the
-	 * block checkout they do nothing, and they break nothing. Set
+	 * block checkout they do nothing, and they break nothing. Shipping_Block
+	 * and Shipping_Exclusion take their rates away on both, and print their
+	 * message and check the submit on the classic one only. Set
 	 * `cart_checkout_blocks` to false only for a service that would break the
 	 * block checkout.
 	 *
@@ -129,6 +133,8 @@ final class Plugin {
 			( new Commune_Select() )->register();
 			( new Cart_Sale_Price() )->register();
 			( new Coupon_Split() )->register();
+			( new Shipping_Block() )->register();
+			( new Shipping_Exclusion() )->register();
 			// The WeLaunch scripts go on WeLaunch's own handle: the three at 99
 			// print in the order they register here, then Store_Choice's at 100,
 			// which ticks from the radios Size_Stores' script sets.

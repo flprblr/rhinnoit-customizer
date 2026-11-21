@@ -42,7 +42,8 @@ defined( 'ABSPATH' ) || exit;
  * wc-checkout, so there it does nothing.
  *
  * The list is the 346 communes, keyed by WooCommerce's codes for the 16
- * regions.
+ * regions. The shipping rules' commune lists on the screen offer the same
+ * names, so with this on, the city a package ships to is one of them.
  */
 final class Commune_Select {
 
@@ -111,6 +112,24 @@ final class Commune_Select {
 
 		// After WooCommerce enqueues wc-checkout, at 10.
 		add_action( 'wp_enqueue_scripts', array( $this, 'add_script' ), 100 );
+	}
+
+	/**
+	 * WooCommerce's names for Chile's regions, by code: what the screen's commune lists head their groups with.
+	 *
+	 * The group_labels callback of the shipping rules' commune lists, which
+	 * the form calls when it draws them. Read from WooCommerce, in the
+	 * admin's language; a region it does not name - a plugin redefining
+	 * Chile's regions under codes of its own - keeps its code.
+	 *
+	 * @return array<mixed>
+	 */
+	public static function region_names(): array {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$countries   = $woocommerce instanceof \WooCommerce ? $woocommerce->countries : null;
+		$names       = $countries instanceof \WC_Countries ? $countries->get_states( 'CL' ) : null;
+
+		return is_array( $names ) ? $names : array();
 	}
 
 	/**

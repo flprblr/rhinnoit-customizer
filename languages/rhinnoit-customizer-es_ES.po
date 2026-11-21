@@ -127,6 +127,74 @@ msgid "For an address in Chile, the classic checkout offers the chosen region's 
 msgstr "En una dirección de Chile, la página de pago clásica ofrece las comunas de la región elegida en un desplegable, como la región. Revisa la página de pago en un teléfono."
 
 #: includes/class-settings.php
+msgid "Shipping methods by commune"
+msgstr "Métodos de envío por comuna"
+
+#: includes/class-settings.php
+msgid "Hide shipping methods in some communes"
+msgstr "Ocultar métodos de envío en algunas comunas"
+
+#: includes/class-settings.php
+msgid "For an address in the communes below, the shipping methods below are not offered, and the cart and the classic checkout show the message. Check both."
+msgstr "En una dirección de las comunas de abajo no se ofrecen los métodos de envío de abajo, y el carrito y la página de pago clásica muestran el mensaje. Revisa ambos."
+
+#: includes/class-settings.php
+msgid "Shipping methods to hide"
+msgstr "Métodos de envío que se ocultan"
+
+#: includes/class-settings.php
+msgid "Listed by shipping zone: pick a method in every zone it should disappear from."
+msgstr "Aparecen por zona de envío: elige el método en cada zona de la que debe desaparecer."
+
+#: includes/class-settings.php
+msgid "Choose shipping methods…"
+msgstr "Elige métodos de envío…"
+
+#: includes/class-settings.php
+msgid "Communes where they are hidden"
+msgstr "Comunas donde se ocultan"
+
+#: includes/class-settings.php
+msgid "Matched with the commune of the shipping address, whatever its accents or capitals."
+msgstr "Se comparan con la comuna de la dirección de envío, sin importar tildes ni mayúsculas."
+
+#: includes/class-settings.php
+msgid "Choose communes…"
+msgstr "Elige comunas…"
+
+#: includes/class-settings.php
+msgid "Message for those communes"
+msgstr "Mensaje para esas comunas"
+
+#: includes/class-settings.php
+msgid "Shown with the shipping options; leave it empty to show nothing."
+msgstr "Se muestra junto a las opciones de envío; déjalo vacío para no mostrar nada."
+
+#: includes/class-settings.php
+msgid "Express delivery is not available for your commune. Please choose another shipping method."
+msgstr "El despacho express no está disponible para tu comuna. Por favor, elige otro método de envío."
+
+#: includes/class-settings.php
+msgid "Deliveries by commune"
+msgstr "Despachos por comuna"
+
+#: includes/class-settings.php
+msgid "Stop deliveries to some communes"
+msgstr "Suspender los despachos a algunas comunas"
+
+#: includes/class-settings.php
+msgid "For an address in the communes below, only store pickup is offered, and the cart and the classic checkout show the message. Check both."
+msgstr "En una dirección de las comunas de abajo solo se ofrece el retiro en tienda, y el carrito y la página de pago clásica muestran el mensaje. Revisa ambos."
+
+#: includes/class-settings.php
+msgid "Communes without delivery"
+msgstr "Comunas sin despacho"
+
+#: includes/class-settings.php
+msgid "We cannot deliver to your commune for the time being. Please check your address, or contact us if you need help."
+msgstr "Por ahora no podemos despachar a tu comuna. Revisa tu dirección o contáctanos si necesitas ayuda."
+
+#: includes/class-settings.php
 msgid "Orders"
 msgstr "Pedidos"
 
@@ -245,6 +313,16 @@ msgstr "Elige una comuna…"
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
 msgstr "Elige primero la región"
+
+#. translators: %s: a shipping zone and one of its methods, as "Zone: method".
+#: includes/frontend/class-shipping-block.php
+#, php-format
+msgid "%s (disabled)"
+msgstr "%s (desactivado)"
+
+#: includes/frontend/class-shipping-communes.php
+msgid "The shipping method you chose is not available for your commune. Please choose another one."
+msgstr "El método de envío que elegiste no está disponible para tu comuna. Por favor, elige otro."
 
 #: includes/frontend/class-store-choice.php
 msgid "Choose home delivery or a store to pick it up."

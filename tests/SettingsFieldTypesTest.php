@@ -2,11 +2,12 @@
 /**
  * The multiselect and textarea types: what the form draws, what it stores, what the plugin reads back.
  *
- * No option uses either type yet, so the cases hand the form and the readers
- * fields of their own, as SettingsNeedsTest hands Settings::fields_for_marks()
- * its own: communes grouped by WooCommerce's region codes, shipping methods
- * by instance id, whose choices live in the database and only a callback
- * lists, and a message for the shopper.
+ * The cases hand the form and the readers fields of their own, as
+ * SettingsNeedsTest hands Settings::fields_for_marks() its own, so the rules
+ * of each type hold whatever the shipping rows that use them say: communes
+ * grouped by WooCommerce's region codes, shipping methods by instance id,
+ * whose choices live in the database and only a callback lists, and a
+ * message for the shopper. ShippingSettingsTest covers those rows.
  *
  * @package RhinnoIT\Customizer
  */
@@ -300,18 +301,22 @@ final class SettingsFieldTypesTest extends TestCase {
 	/**
 	 * The readers take the key without its prefix, and the default from the field declared under it.
 	 *
-	 * No option of either type exists yet, so the master switch's row stands in.
-	 *
 	 * @return void
 	 */
 	public function test_the_readers_find_the_row_and_the_field_by_key(): void {
-		WP_Stub::$options['rcus_enabled'] = 'no';
+		WP_Stub::$options['rcus_shipping_exclusion_message']  = 'No despachamos a Penco.';
+		WP_Stub::$options['rcus_shipping_exclusion_communes'] = array( 'Penco', 'Gotham' );
+		WP_Stub::$options['rcus_shipping_block_methods']      = array( '6', 'Express' );
 
-		$this->assertSame( 'no', Settings::text( 'enabled' ) );
+		$this->assertSame( 'No despachamos a Penco.', Settings::text( 'shipping_exclusion_message' ) );
+		$this->assertSame( array( 'Penco' ), Settings::chosen( 'shipping_exclusion_communes' ), 'Read against its own field\'s communes.' );
+		$this->assertSame( array( '6' ), Settings::chosen( 'shipping_block_methods' ), 'Read against its own field\'s id format.' );
 
-		WP_Stub::$options['rcus_enabled'] = array( 'no' );
+		WP_Stub::$options['rcus_shipping_exclusion_message']  = array( 'No despachamos.' );
+		WP_Stub::$options['rcus_shipping_exclusion_communes'] = 'Penco';
 
-		$this->assertSame( 'yes', Settings::text( 'enabled' ), 'The declared default of the master switch.' );
+		$this->assertSame( 'We cannot deliver to your commune for the time being. Please check your address, or contact us if you need help.', Settings::text( 'shipping_exclusion_message' ), 'The declared default of its own field.' );
+		$this->assertSame( array(), Settings::chosen( 'shipping_exclusion_communes' ), 'Its field declares an empty list.' );
 		$this->assertSame( array(), Settings::chosen( 'enabled' ), 'A field with no choices keeps nothing.' );
 		$this->assertSame( '', Settings::text( 'nothing_by_this_name' ) );
 		$this->assertSame( array(), Settings::chosen( 'nothing_by_this_name' ) );

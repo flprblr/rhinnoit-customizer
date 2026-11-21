@@ -36,6 +36,12 @@ final class HookArityTest extends TestCase {
 			WP_Stub::$options[ $option ] = 'yes';
 		}
 
+		// A list holds ids, not 'yes': with nothing chosen the shipping rules
+		// are inert and hook nothing to check.
+		WP_Stub::$options['rcus_shipping_block_methods']      = array( '6' );
+		WP_Stub::$options['rcus_shipping_block_communes']     = array( 'Paine' );
+		WP_Stub::$options['rcus_shipping_exclusion_communes'] = array( 'Penco' );
+
 		$services = array(
 			new RhinnoIT\Customizer\Assets(),
 			new RhinnoIT\Customizer\Frontend\Widget_Thumbnail(),
@@ -45,6 +51,8 @@ final class HookArityTest extends TestCase {
 			new RhinnoIT\Customizer\Frontend\Commune_Select(),
 			new RhinnoIT\Customizer\Frontend\Cart_Sale_Price(),
 			new RhinnoIT\Customizer\Frontend\Coupon_Split(),
+			new RhinnoIT\Customizer\Frontend\Shipping_Block(),
+			new RhinnoIT\Customizer\Frontend\Shipping_Exclusion(),
 			new RhinnoIT\Customizer\Frontend\Inventory_Links(),
 			new RhinnoIT\Customizer\Frontend\Quick_View_Store(),
 			new RhinnoIT\Customizer\Frontend\Size_Stores(),
@@ -76,18 +84,20 @@ final class HookArityTest extends TestCase {
 			$classes[ $class ] = true;
 		}
 
-		foreach ( array( 'Inventory_Links', 'Quick_View_Store', 'Size_Stores', 'Store_Choice', 'Pickup_Stores', 'Store_Stock_Hold' ) as $welaunch ) {
-			$this->assertArrayHasKey( 'RhinnoIT\\Customizer\\Frontend\\' . $welaunch, $classes, sprintf( '%s hooked nothing, so its callbacks went unchecked.', $welaunch ) );
+		foreach ( array( 'Shipping_Block', 'Shipping_Exclusion', 'Inventory_Links', 'Quick_View_Store', 'Size_Stores', 'Store_Choice', 'Pickup_Stores', 'Store_Stock_Hold' ) as $conditional ) {
+			$this->assertArrayHasKey( 'RhinnoIT\\Customizer\\Frontend\\' . $conditional, $classes, sprintf( '%s hooked nothing, so its callbacks went unchecked.', $conditional ) );
 		}
 
-		// The listed services hook thirty-three methods: Assets 1,
+		// The listed services hook forty-three methods: Assets 1,
 		// Widget_Thumbnail 2, Widget_Sale_Price 1, Express_Checkout 2,
 		// Checkout_Focus 1, Commune_Select 1, Cart_Sale_Price 3, Coupon_Split 1,
-		// Inventory_Links 2, Quick_View_Store 1, Size_Stores 2, Store_Choice 4,
-		// Pickup_Stores 1, Store_Stock_Hold 4, Unpaid_Orders 1,
-		// Fintoc_Session_Expiry 1, Menu 3, Settings_Page 1 through Menu, and
-		// Plugin_Links 1. Fewer means the list above lost a service; raise it
-		// with every service added, lower it with one removed.
-		$this->assertGreaterThanOrEqual( 33, $checked, 'Most hooks went unchecked, so this case proves little.' );
+		// Shipping_Block 4, Shipping_Exclusion 6, Inventory_Links 2,
+		// Quick_View_Store 1, Size_Stores 2, Store_Choice 4, Pickup_Stores 1,
+		// Store_Stock_Hold 4, Unpaid_Orders 1, Fintoc_Session_Expiry 1, Menu 3,
+		// Settings_Page 1 through Menu, and Plugin_Links 1. The save hook both
+		// shipping services add calls a static method, which takes nothing.
+		// Fewer means the list above lost a service; raise it with every
+		// service added, lower it with one removed.
+		$this->assertGreaterThanOrEqual( 43, $checked, 'Most hooks went unchecked, so this case proves little.' );
 	}
 }

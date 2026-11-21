@@ -42,6 +42,11 @@ final class BootTest extends TestCase {
 			WP_Stub::$options[ 'rcus_' . $switch ] = 'yes';
 		}
 
+		// The shipping rules hook nothing while their lists are empty.
+		WP_Stub::$options['rcus_shipping_block_methods']      = array( '6' );
+		WP_Stub::$options['rcus_shipping_block_communes']     = array( 'Paine' );
+		WP_Stub::$options['rcus_shipping_exclusion_communes'] = array( 'Penco' );
+
 		Plugin::boot();
 
 		// One callback per service, so dropping any registration goes red.
@@ -58,6 +63,8 @@ final class BootTest extends TestCase {
 				'template_redirect:drop_the_prompts',
 				'woocommerce_cart_item_subtotal:strike_line_subtotal',
 				'woocommerce_coupon_get_items_to_apply:split',
+				'woocommerce_package_rates:hide_rates',
+				'woocommerce_package_rates:keep_pickup_only',
 				'woocommerce_cancel_unpaid_orders_interval_minutes:shorten_interval',
 				'woocommerce_fintoc_checkout_session_payload:end_with_hold',
 			) as $callback

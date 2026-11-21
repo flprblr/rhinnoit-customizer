@@ -70,6 +70,26 @@ final class WP_Stub {
 	public static bool $is_admin = true;
 	/** @var array<int, string> srcset by attachment id, as wp_get_attachment_image_srcset() returns it. */
 	public static array $srcsets = array();
+	/**
+	 * Text => translation, what __() answers once the plugin's translations load on init.
+	 *
+	 * Empty is a request before init, or a shop in English: __() hands every
+	 * text back as it came.
+	 *
+	 * @var array<string, string>
+	 */
+	public static array $translations = array();
+	/**
+	 * WooCommerce's shipping zones by id: a name, the regions it covers and its methods.
+	 *
+	 * Zone 0 is the one for the locations no other zone covers; without an
+	 * entry it has WooCommerce's name and no method.
+	 *
+	 * @var array<int, array{name?: string, states?: array<int, string>, methods?: array<int, object>}>
+	 */
+	public static array $zones = array();
+	/** Times WC_Shipping_Zones::get_zones() read every zone. */
+	public static int $zone_listings = 0;
 	/** @var array<string, int> Named callbacks registered on a filter, hook:callback => priority, for has_filter(). */
 	public static array $present_filters = array();
 	/** @var array<int, object> Orders by id, for wc_get_order(). */
@@ -228,6 +248,9 @@ final class WP_Stub {
 		);
 		self::$is_admin        = true;
 		self::$srcsets         = array();
+		self::$translations    = array();
+		self::$zones           = array();
+		self::$zone_listings   = 0;
 		self::$orders          = array();
 		self::$reserved        = array();
 		self::$terms           = array();
@@ -296,8 +319,34 @@ final class WP_Stub {
 /** Thrown in place of wp_die()/exit so tests can assert on it. */
 final class WP_Halt extends RuntimeException {}
 
-function __( $text ) { return $text; }
+function __( $text, $domain = 'default' ) { return WP_Stub::$translations[ $text ] ?? $text; }
 function esc_html__( $text ) { return $text; }
+/**
+ * Core's remove_accents(), for the letters a Chilean address can carry: the accented vowels, ñ, ü and ç, either case.
+ *
+ * @param string $text   Text.
+ * @param string $locale Locale; core asks it for German and Danish only.
+ * @return string
+ */
+function remove_accents( $text, $locale = '' ) {
+	return strtr(
+		(string) $text,
+		array(
+			'á' => 'a', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ã' => 'a',
+			'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+			'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+			'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'ö' => 'o', 'õ' => 'o',
+			'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+			'ñ' => 'n', 'ç' => 'c',
+			'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ä' => 'A', 'Ã' => 'A',
+			'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+			'Í' => 'I', 'Ì' => 'I', 'Î' => 'I', 'Ï' => 'I',
+			'Ó' => 'O', 'Ò' => 'O', 'Ô' => 'O', 'Ö' => 'O', 'Õ' => 'O',
+			'Ú' => 'U', 'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U',
+			'Ñ' => 'N', 'Ç' => 'C',
+		)
+	);
+}
 function wp_strip_all_tags( $text ) { return trim( strip_tags( (string) $text ) ); }
 function esc_html( $text ) { return htmlspecialchars( (string) $text, ENT_QUOTES ); }
 function esc_attr( $text ) { return htmlspecialchars( (string) $text, ENT_QUOTES ); }
@@ -331,7 +380,7 @@ function get_option( $key, $default_value = false ) { return WP_Stub::$options[ 
 function add_option( $key, $value ) { WP_Stub::$options[ $key ] ??= $value; return true; }
 function update_option( $key, $value ) { WP_Stub::$options[ $key ] = $value; return true; }
 function get_transient( $key ) { return WP_Stub::$transients[ $key ] ?? false; }
-function set_transient( $key, $value, $ttl ) { WP_Stub::$transients[ $key ] = $value; return true; }
+function set_transient( $key, $value, $ttl = 0 ) { WP_Stub::$transients[ $key ] = $value; return true; }
 
 function rcus_stub_callback_name( $cb ) { return is_array( $cb ) ? (string) $cb[1] : ( is_string( $cb ) ? $cb : 'closure' ); }
 function rcus_stub_register( $hook, $cb, $priority, $args ) {

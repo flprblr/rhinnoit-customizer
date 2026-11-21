@@ -330,6 +330,260 @@ class WooCommerce {
 
 	/** The cookie handler, or the Store API's own handler for a cart token. */
 	public ?object $session = null;
+
+	/** WooCommerce's countries and their regions. */
+	public ?WC_Countries $countries = null;
+
+	/** What shipping() answers; WooCommerce's is a singleton, this one lives as long as the WooCommerce it hangs from. */
+	public ?WC_Shipping $shipping = null;
+
+	public function shipping(): WC_Shipping {
+		return $this->shipping ??= new WC_Shipping();
+	}
+}
+
+/**
+ * WooCommerce's shipping: the packages the cart was last shipped as.
+ */
+class WC_Shipping {
+
+	/**
+	 * Package index => package, as WC_Cart::get_shipping_packages() builds them and calculate_shipping_for_package() fills their rates.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	public array $packages = array();
+
+	public function get_packages(): array {
+		return $this->packages;
+	}
+}
+
+/**
+ * One rate of a package, as a shipping method adds it: WooCommerce 11.2's constructor, and the getters the services ask.
+ */
+class WC_Shipping_Rate {
+
+	/**
+	 * @param string $id          Rate id: the method id and instance id, as "flat_rate:6".
+	 * @param string $label       What the shopper reads.
+	 * @param float  $cost        Cost.
+	 * @param array  $taxes       Taxes.
+	 * @param string $method_id   The shipping method's id.
+	 * @param int    $instance_id The zone method instance that added it; 0 for a method outside every zone.
+	 */
+	public function __construct( public string $id = '', public string $label = '', public float $cost = 0.0, public array $taxes = array(), public string $method_id = '', public int $instance_id = 0 ) {}
+
+	public function get_id() {
+		return $this->id;
+	}
+
+	public function get_label() {
+		return $this->label;
+	}
+
+	public function get_method_id() {
+		return $this->method_id;
+	}
+
+	public function get_instance_id() {
+		return $this->instance_id;
+	}
+}
+
+/**
+ * One shipping method of one zone: what the shipping services read of it.
+ */
+class WC_Shipping_Method {
+
+	/** 'yes' or 'no', as WooCommerce sets it from the zone's own column. */
+	public string $enabled = 'yes';
+
+	/**
+	 * @param int    $instance_id The instance's id, unique across zones.
+	 * @param string $id          The method's id: flat_rate, local_pickup...
+	 * @param string $title       The title the owner gave the instance.
+	 * @param bool   $enabled     Whether the zone has it enabled.
+	 */
+	public function __construct( public int $instance_id = 0, public string $id = 'flat_rate', public string $title = '', bool $enabled = true ) {
+		$this->enabled = $enabled ? 'yes' : 'no';
+	}
+
+	public function get_instance_id() {
+		return $this->instance_id;
+	}
+
+	public function get_title() {
+		return $this->title;
+	}
+
+	public function is_enabled() {
+		return 'yes' === $this->enabled;
+	}
+}
+
+/**
+ * A shipping zone, read from WP_Stub::$zones by id; zone 0 is the one for the locations no other zone covers.
+ */
+class WC_Shipping_Zone {
+
+	private int $id;
+
+	/**
+	 * @param int|string|null $zone Zone id.
+	 */
+	public function __construct( $zone = null ) {
+		$this->id = (int) $zone;
+	}
+
+	public function get_id() {
+		return $this->id;
+	}
+
+	/**
+	 * The zone's name; zone 0's is WooCommerce's own.
+	 */
+	public function get_zone_name( $context = 'view' ) {
+		return WP_Stub::$zones[ $this->id ]['name'] ?? ( 0 === $this->id ? 'Locations not covered by your other zones' : '' );
+	}
+
+	/**
+	 * Its methods by instance id, in order; only the enabled ones when asked.
+	 *
+	 * @param bool   $enabled_only Only the enabled methods.
+	 * @param string $context      admin or json.
+	 * @return array<int, WC_Shipping_Method>
+	 */
+	public function get_shipping_methods( $enabled_only = false, $context = 'admin' ) {
+		$methods = array();
+
+		foreach ( WP_Stub::$zones[ $this->id ]['methods'] ?? array() as $method ) {
+			if ( ! $enabled_only || $method->is_enabled() ) {
+				$methods[ $method->get_instance_id() ] = $method;
+			}
+		}
+
+		return $methods;
+	}
+}
+
+/**
+ * WooCommerce's zones, as WP_Stub::$zones holds them.
+ */
+class WC_Shipping_Zones {
+
+	/**
+	 * Every zone but zone 0, by id, as WooCommerce 11.2 lists them: data arrays with their methods.
+	 *
+	 * Counts its calls in WP_Stub::$zone_listings: it reads every zone, which
+	 * only the settings screen may do.
+	 *
+	 * @param string $context admin or json.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_zones( $context = 'admin' ) {
+		++WP_Stub::$zone_listings;
+
+		$zones = array();
+
+		foreach ( array_keys( WP_Stub::$zones ) as $id ) {
+			if ( 0 === $id ) {
+				continue;
+			}
+
+			$zone         = new WC_Shipping_Zone( $id );
+			$zones[ $id ] = array(
+				'id'                      => $id,
+				'zone_name'               => $zone->get_zone_name( 'edit' ),
+				'zone_order'              => 0,
+				'zone_locations'          => array(),
+				'zone_id'                 => $id,
+				'formatted_zone_location' => '',
+				'shipping_methods'        => $zone->get_shipping_methods( false, $context ),
+			);
+		}
+
+		return $zones;
+	}
+
+	/**
+	 * The first zone whose regions include the package's, else zone 0, as WooCommerce matches a package.
+	 *
+	 * @param array<string, mixed> $package Shipping package.
+	 * @return WC_Shipping_Zone
+	 */
+	public static function get_zone_matching_package( $package ) {
+		foreach ( WP_Stub::$zones as $id => $zone ) {
+			if ( 0 !== $id && in_array( $package['destination']['state'], $zone['states'] ?? array(), true ) ) {
+				return new WC_Shipping_Zone( $id );
+			}
+		}
+
+		return new WC_Shipping_Zone( 0 );
+	}
+}
+
+/**
+ * WooCommerce's countries: the regions of the one country the plugin names.
+ */
+class WC_Countries {
+
+	/**
+	 * WooCommerce 11.2's names for Chile's regions (i18n/states.php), the only country stubbed.
+	 *
+	 * @param string|null $cc Country code; null for every country.
+	 * @return array<string, mixed>|false
+	 */
+	public function get_states( $cc = null ) {
+		$states = array(
+			'CL' => array(
+				'CL-AI' => 'Aisén del General Carlos Ibañez del Campo',
+				'CL-AN' => 'Antofagasta',
+				'CL-AP' => 'Arica y Parinacota',
+				'CL-AR' => 'La Araucanía',
+				'CL-AT' => 'Atacama',
+				'CL-BI' => 'Biobío',
+				'CL-CO' => 'Coquimbo',
+				'CL-LI' => 'Libertador General Bernardo O\'Higgins',
+				'CL-LL' => 'Los Lagos',
+				'CL-LR' => 'Los Ríos',
+				'CL-MA' => 'Magallanes',
+				'CL-ML' => 'Maule',
+				'CL-NB' => 'Ñuble',
+				'CL-RM' => 'Región Metropolitana de Santiago',
+				'CL-TA' => 'Tarapacá',
+				'CL-VS' => 'Valparaíso',
+			),
+		);
+
+		return null === $cc ? $states : ( $states[ $cc ] ?? false );
+	}
+}
+
+/**
+ * WooCommerce's cache versions.
+ */
+class WC_Cache_Helper {
+
+	/**
+	 * WooCommerce 11.2's own, line for line: the version a group's cached data is keyed by, renewed when asked to.
+	 *
+	 * @param string $group   Cache group.
+	 * @param bool   $refresh Whether to renew it.
+	 * @return string
+	 */
+	public static function get_transient_version( $group, $refresh = false ) {
+		$transient_name  = $group . '-transient-version';
+		$transient_value = get_transient( $transient_name );
+
+		if ( false === $transient_value || true === $refresh ) {
+			$transient_value = sprintf( '%.6F', microtime( true ) );
+
+			set_transient( $transient_name, $transient_value );
+		}
+
+		return $transient_value;
+	}
 }
 
 function WC() { return WP_Stub::$wc; }

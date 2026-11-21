@@ -62,6 +62,8 @@ includes/
 │   ├── class-commune-select.php        Chile's communes as a dropdown on the checkout
 │   ├── class-cart-sale-price.php       Regular price struck through in the cart
 │   ├── class-coupon-split.php          Splits a fixed cart coupon by each line's price
+│   ├── class-shipping-block.php        Hides chosen shipping methods for chosen communes
+│   ├── class-shipping-exclusion.php    Stops deliveries to chosen communes, store pickup kept
 │   ├── class-inventory-links.php       Keeps WeLaunch's store out of links and cached pages
 │   ├── class-quick-view-store.php      Sends the store picked in Porto's quick view
 │   ├── class-size-stores.php           Each size's stores, in the page before WeLaunch answers
@@ -70,7 +72,8 @@ includes/
 │   ├── class-store-stock-hold.php      Holds a store's units while an order is paid
 │   ├── class-unpaid-orders.php         Checks for unpaid orders every 2 minutes
 │   ├── class-fintoc-session-expiry.php Ends Fintoc's payment page with the stock hold
-│   └── class-cart-state.php            Shared "nothing to ship" check, not a service
+│   ├── class-cart-state.php            Shared "nothing to ship" check, not a service
+│   └── class-shipping-communes.php     What the two shipping rules share, not a service
 └── admin/
     ├── class-menu.php          Shared node, its place in the menu, the page
     ├── class-settings-page.php The settings form: drawn, sanitized and saved
@@ -171,6 +174,8 @@ code of 2.8.13.
 | Hide the coupon prompt | **off** | On a checkout where every item is virtual. Classic checkout only. |
 | Hide the login prompt | **off** | Same condition. Classic checkout only. |
 | Pick the commune from a list | on | Classic checkout only, for an address in Chile. WooCommerce draws the region as a dropdown and the commune (the city field) as free text, so one commune reached the orders spelt many ways. Once the country is Chile and every region the region dropdown offers is one of WooCommerce's 16 codes, a script printed after `wc-checkout` swaps the text box for a dropdown of that region's communes (`Commune_Select::COMMUNES`, 346 in all), enhanced by selectWoo like the region. It keeps the field's id, name and autocomplete, so the label, the Checkout Field Editor's settings and the order are unchanged: the order gets the commune's name. A saved value is picked when it names a commune of the region, ignoring case and accents, otherwise the shopper chooses; changing the region rebuilds the list and another country gives the text box back. A region dropdown with codes of its own (a plugin redefining Chile's regions: hoka's shipping zones still name `CL_RM` and others) keeps the text box, which an empty list would have made impossible to fill. Nothing is validated on the server, so without the script the text box stays. |
+| Hide shipping methods in some communes | on, inert until both lists hold something | For a same-day promise the courier keeps in a city's central communes only: what YNK Bloqueo Despacho Express por Comuna did with one instance id and 19 communes written in its code. **Shipping methods to hide** lists every method of every zone as *zone: method* (the zone for the locations no other zone covers last, a disabled method marked), stored by instance id, so renaming a method changes nothing and the same kind of method in another zone stays; **Communes where they are hidden** offers Chile's 346 communes under WooCommerce's names for the regions. For a package whose commune matches (see below), the chosen instances' rates are taken off `woocommerce_package_rates` at `PHP_INT_MAX`, after the couriers' plugins add theirs: the cart and both checkouts lose them. While a package's commune matches and its zone has one of the methods enabled, **Message for those communes** shows as its own row under the shipping options of the cart totals and the classic checkout's order review (`woocommerce_cart_totals_after_shipping`, `woocommerce_review_order_after_shipping`), once, escaped, its line breaks kept; an empty message shows nothing, and the methods still go. A hidden method still in the rates WooCommerce stored before the rule changed, and chosen, is refused at the classic checkout's submit (`woocommerce_after_checkout_validation`) with the message, or a sentence of the plugin's when the message is empty; a hidden method that is gone from the rates WooCommerce refuses itself. |
+| Stop deliveries to some communes | on, inert until its list holds something | For when the courier stops delivering somewhere, a disaster zone for instance: what regiones-excluidas-envio did with communes and a message written in its code, without its removal of store pickup. For a package whose commune is one of **Communes without delivery**, every rate but WooCommerce's pickup ones (method ids `local_pickup` and `pickup_location`) is taken off `woocommerce_package_rates` at `PHP_INT_MAX`, whatever zone or courier offers it, in the cart and both checkouts. With pickup left, **Message for those communes** shows as its own row under the shipping options, as above; with nothing left, it replaces WooCommerce's own "no shipping options" text in that package (`woocommerce_no_shipping_available_html` on the classic checkout, `woocommerce_cart_no_shipping_available_html` in the cart) and no row is printed, so it shows once. An empty message prints nothing and leaves WooCommerce's text. A delivery still in stored rates, and chosen, is refused at the classic checkout's submit as above. |
 | Cancel unpaid orders on time | on | WooCommerce looks for unpaid orders once per Hold stock period N and cancels checkout orders pending since their last update + N, so one can wait almost 2N. With N of 15 minutes or more, `woocommerce_cancel_unpaid_orders_interval_minutes` returns 2, which all three places that schedule WooCommerce's job read (after each run, the 03:00 Action Scheduler repair, a Products > Inventory save). Below 15 it steps aside: Webpay's window is about 9-10 minutes, and a payment confirmed after the cancellation reopens the order. On the classic checkout stock and coupons do not change: a pending order holds neither, and the reservation expires at N anyway; the block checkout counts a coupon as used from pending until the cancellation. What comes sooner is the Cancelled status, the admin email and the end of the Pay button. Replaces a must-use file that queried Action Scheduler on every uncached request, ran the cancellation twice and left a 5-minute recurring job that outlives it; that job stops once WooCommerce's own check runs first (this switch on with N of 15 or more) or on a Products > Inventory save. Nothing is scheduled here, so turning it off needs no cleanup. |
 | Avoid late Fintoc payments | on | Fintoc for WooCommerce 1.2.4 sends no `expires_at`, so each Checkout Session stays payable for 24 hours, and a late payment completes a cancelled or failed order through `payment_complete()` after its units were freed. `woocommerce_fintoc_checkout_session_payload` gets `expires_at` = the order's creation + Hold stock, or now + 11 minutes if later (Fintoc's minimum is 10); Fintoc then cancels the unpaid order itself on `checkout_session.expired`. Steps aside when the payload already has an expiry, stock is not managed or Hold stock is 0. Fintoc cancels on the expiry of any of the order's sessions, so a retry's session can stay payable up to 11 minutes after the first one cancelled the order. |
 
@@ -201,9 +206,29 @@ answered from `woocommerce_ajax_added_to_cart` with `{error: true,
 product_url: <checkout>}`, which both scripts already follow. Nothing depends
 on the cart in the printed page, and no button is changed.
 
+Both shipping rules match a package by the city it ships to
+(`$package['destination']['city']`) against their communes, once both are
+normalized: accents removed, lowercase, trimmed, inner whitespace collapsed.
+With **Pick the commune from a list** on the city is the commune's official
+name; with it off it is what the shopper typed, so "nunoa" matches Ñuñoa and
+"Santiago Centro" matches nothing. The region is not compared. A commune in
+both rules' lists loses its deliveries and can show both messages. WooCommerce
+keeps each package's rates in the shopper's session under a hash that
+includes its `shipping` transient version, and recalculates them only when the
+package changes, so every save of a settings screen of the group
+(`rhinnoit_settings_saved`) bumps that version with
+`WC_Cache_Helper::get_transient_version( 'shipping', true )`, as WooCommerce
+does when its own zones are saved, whatever the switches say: the save that
+turns a rule off has to free the rates it hid. An option changed outside the
+screen (WP-CLI, code) waits for each shopper's cart or address to change;
+save the screen afterwards. A message never saved follows the shop's language;
+saving the screen stores the text its box shows, in the admin's.
+
 ## Cached pages and the Optimizer
 
-This plugin clears no cache. What it prints goes into cached pages - the
+This plugin clears no page cache (the shipping rules only bump WooCommerce's
+own shipping version, which keys the rates stored in each shopper's session:
+see *What it does*). What it prints goes into cached pages - the
 struck-through price's style on every page (the mini cart is in the header),
 the markup and style of Porto's product widgets, the WeLaunch scripts, and
 each size's stores in a product page - so on a shop with a page cache it stays
@@ -393,10 +418,15 @@ produce - one of its `'options'`, or for a callback's list one matching the
 field's `'id_format'` (`Settings::DIGITS`), since a storefront request never
 asks the callback. A `textarea` stores one text through
 `sanitize_textarea_field()`, line breaks kept, and is read back through
-`Settings::text()`. Either reader takes a row of the wrong type as its field's
-declared default. A `multiselect`'s title names what is picked and a
-`textarea`'s what is written, each with one sentence of what the owner or the
-shopper notices.
+`Settings::text()` the first time it is printed. Its declared default is a
+translated sentence, so it is never seeded: `Settings::defaults()`, which
+activation writes, is first built on `plugins_loaded`, before the translations
+load on `init`, and would have stored it in English. Until the screen is saved
+the row stays empty and the default follows the shop's language; the box
+shows it, and saving stores it as shown. Either reader takes a row of the
+wrong type as its field's declared default. A `multiselect`'s title names what
+is picked and a `textarea`'s what is written, each with one sentence of what
+the owner or the shopper notices.
 
 The form posts to `admin-post.php` with a nonce and a check of
 `Menu::capability()`: `manage_woocommerce` where WooCommerce is active, shared
@@ -614,6 +644,16 @@ WooCommerce's own precision helpers, and its cases apply real coupons the way
 runs on the shop. `WP_Stub::$live_filters` runs a callback where such a class
 calls one through a filter. Refresh the copy by replacing the two files.
 
+The shipping rules' cases build packages and rates in the shape WooCommerce
+hands them to `woocommerce_package_rates`, and their zones in
+`WP_Stub::$zones`, which the stubs of `WC_Shipping_Zones` and
+`WC_Shipping_Zone` read; `WP_Stub::$zone_listings` counts the reads of every
+zone, which only the settings screen may make. `WC_Cache_Helper` is
+WooCommerce 11.2's own. `__()` answers from `WP_Stub::$translations`, empty
+until a case fills it the way the plugin's translations load on `init`, after
+the services register: that is how the cases pin that a message is read when
+it is printed, not in `register()`.
+
 The suite is not decoration. Most of it covers a defect that reached a fatal
 error or a dead admin page before it was fixed; the rest pins a decision that
 is cheap to undo by accident — that the node stays under Dashboard, that the
@@ -679,6 +719,8 @@ without WooCommerce, so those paths are hardened:
 | WP Optimizer still active                    | Nothing but a notice to admins; activation still copies its settings |
 | Porto, WeLaunch or Fintoc missing            | What is built on them steps aside, and its switch is not offered |
 | A plugin changes a coupon's share, or `WC_Discounts` starts no row for it | WooCommerce splits that coupon its own way, one log entry per day |
+| A shipping package names no city as text      | No commune matches; every rate stays       |
+| A shipping list changed outside the screen   | Stored rates keep the old rule until the shopper's cart or address changes; a save of the screen refreshes them |
 | No WooCommerce to log to                     | Written to PHP's error log instead         |
 
 None of them raise a fatal error. The rule for anything reachable from a
@@ -726,7 +768,8 @@ extends does:
   to `false` only for a feature that would break the block checkout; one that
   just does nothing there stays compatible, like the checkout prompts, the
   commune list and the store stock hold, which act on the classic checkout
-  only.
+  only. The two shipping rules take their rates away on both checkouts, and
+  print their message and check the submit on the classic one only.
 - Errors go to **WooCommerce → Status → Logs** through `Logger`, under the
   source `rhinnoit-customizer`, or to PHP's error log on a site without
   WooCommerce.

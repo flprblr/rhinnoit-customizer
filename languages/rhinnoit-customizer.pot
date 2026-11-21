@@ -122,6 +122,74 @@ msgid "For an address in Chile, the classic checkout offers the chosen region's 
 msgstr ""
 
 #: includes/class-settings.php
+msgid "Shipping methods by commune"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Hide shipping methods in some communes"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "For an address in the communes below, the shipping methods below are not offered, and the cart and the classic checkout show the message. Check both."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Shipping methods to hide"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Listed by shipping zone: pick a method in every zone it should disappear from."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Choose shipping methods…"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Communes where they are hidden"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Matched with the commune of the shipping address, whatever its accents or capitals."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Choose communes…"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Message for those communes"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Shown with the shipping options; leave it empty to show nothing."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Express delivery is not available for your commune. Please choose another shipping method."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Deliveries by commune"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Stop deliveries to some communes"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "For an address in the communes below, only store pickup is offered, and the cart and the classic checkout show the message. Check both."
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Communes without delivery"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "We cannot deliver to your commune for the time being. Please check your address, or contact us if you need help."
+msgstr ""
+
+#: includes/class-settings.php
 msgid "Orders"
 msgstr ""
 
@@ -239,6 +307,16 @@ msgstr ""
 
 #: includes/frontend/class-commune-select.php
 msgid "Choose the region first"
+msgstr ""
+
+#. translators: %s: a shipping zone and one of its methods, as "Zone: method".
+#: includes/frontend/class-shipping-block.php
+#, php-format
+msgid "%s (disabled)"
+msgstr ""
+
+#: includes/frontend/class-shipping-communes.php
+msgid "The shipping method you chose is not available for your commune. Please choose another one."
 msgstr ""
 
 #: includes/frontend/class-store-choice.php
