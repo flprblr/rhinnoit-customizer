@@ -5,10 +5,11 @@
  * the newer WooCommerce screens use, drawn over the plain markup
  * Settings_Page prints: a card per section, a row per setting with its text
  * on the left and its control on the right, and checkboxes drawn as the
- * component's toggle. Everything is scoped under .rcus-settings, which also
- * lifts these rules above core's own h2, p, label and input[type="checkbox"]
- * rules, including the checkmark core draws in ::before. Without this sheet
- * the form is plain labels and checkboxes that work the same.
+ * component's toggle; a list or a text box goes below its text and fills the
+ * row. Everything is scoped under .rcus-settings, which also lifts these rules
+ * above core's own h2, p, label and input[type="checkbox"] rules, including
+ * the checkmark core draws in ::before. Without this sheet the form is plain
+ * labels, checkboxes, multiple selects and text boxes that work the same.
  */
 
 $rcus-accent: var(--wp-admin-theme-color, #2271b1);
@@ -97,6 +98,29 @@ $rcus-gray-100: #f0f0f0;
 
 	.rcus-row__control {
 		flex: none;
+	}
+
+	// A list or a text box needs the row's width, so its text goes above it
+	// and the control fills the row below.
+	.rcus-row--wide {
+		display: block;
+
+		.rcus-row__control {
+			margin-top: 8px;
+		}
+	}
+
+	// Core's large-text stops at 99%, short of the select boxes around it.
+	.rcus-select,
+	.rcus-row--wide .large-text {
+		width: 100%;
+	}
+
+	// selectWoo writes the width it measured on load into its box's style
+	// attribute, which only !important outweighs; WooCommerce's own wide
+	// selects do the same.
+	.rcus-row--wide .select2-container {
+		width: 100% !important;
 	}
 
 	// With the master switch off nothing below applies, so it reads as off.

@@ -12,7 +12,7 @@ use RhinnoIT\Customizer\Admin\Menu;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Loads the build/ bundles only where they are needed.
+ * Loads the build/ bundles only where they are needed, and WooCommerce's selectWoo beside the admin one.
  */
 final class Assets {
 
@@ -26,12 +26,25 @@ final class Assets {
 	const string BROKEN_BUILD_FLAG = 'rcus_broken_build_';
 
 	/**
+	 * WooCommerce's script that turns a select with the wc-enhanced-select class into selectWoo's searchable box.
+	 */
+	const string SELECT_SCRIPT = 'wc-enhanced-select';
+
+	/**
+	 * WooCommerce's admin stylesheet, which draws that box.
+	 */
+	const string SELECT_STYLE = 'woocommerce_admin_styles';
+
+	/**
 	 * Hooks the enqueueing.
 	 *
 	 * @return void
 	 */
 	public function register(): void {
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin' ) );
+		// At 20: WooCommerce registers its admin stylesheet from a callback at
+		// 10 that it adds on init, after this one, so at 10 this ran first and
+		// found nothing registered.
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin' ), 20 );
 	}
 
 	/**
@@ -44,7 +57,35 @@ final class Assets {
 			return;
 		}
 
+		if ( Plugin::woocommerce_is_supported() ) {
+			$this->enqueue_woocommerce_select();
+		}
+
 		$this->enqueue( 'admin' );
+	}
+
+	/**
+	 * WooCommerce's own selectWoo, for the multiselects of the settings form.
+	 *
+	 * The script and stylesheet WooCommerce's settings screens enhance a
+	 * multiselect with, so a list on this screen is the box of WooCommerce's
+	 * "Sell to specific countries" setting: searchable, its choices kept as
+	 * chips with an x. Each is enqueued only if WooCommerce registered it; a
+	 * WooCommerce that renamed one leaves a native multiple select, which
+	 * posts the same. Only where WooCommerce is supported, since everywhere
+	 * else the form draws the master switch alone, and before the bundle, so
+	 * this plugin's stylesheet comes after WooCommerce's.
+	 *
+	 * @return void
+	 */
+	private function enqueue_woocommerce_select(): void {
+		if ( wp_script_is( self::SELECT_SCRIPT, 'registered' ) ) {
+			wp_enqueue_script( self::SELECT_SCRIPT );
+		}
+
+		if ( wp_style_is( self::SELECT_STYLE, 'registered' ) ) {
+			wp_enqueue_style( self::SELECT_STYLE );
+		}
 	}
 
 	/**

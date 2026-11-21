@@ -50,8 +50,10 @@ UI strings and documentation.
   WooCommerce only behind a guard: `Plugin::woocommerce_is_active()`,
   `function_exists()` / `class_exists()`, or ids that only exist where
   WooCommerce is supported. The shell's own cases are `Logger::log()`,
-  `Plugin::declare_woocommerce_compatibility()` and `Settings::conditions()`,
-  which asks `Coupon_Split` only behind the WooCommerce answer. Every service
+  `Plugin::declare_woocommerce_compatibility()`, `Settings::conditions()`,
+  which asks `Coupon_Split` only behind the WooCommerce answer, and
+  `Assets::enqueue_admin()`, which enqueues WooCommerce's selectWoo only
+  behind the same answer and only once WooCommerce registered it. Every service
   of this plugin needs WooCommerce, so all of them live in `includes/frontend/`
   under `...\Frontend` (`Widget_Thumbnail`, `Widget_Sale_Price`,
   `Express_Checkout`, `Checkout_Focus`, `Commune_Select`, `Cart_Sale_Price`,
@@ -151,7 +153,9 @@ UI strings and documentation.
   WooCommerce half), escape on output (`esc_html`, `esc_attr`, `esc_url`,
   `wp_kses_post`). Every dynamic value the admin screen prints has a case fed a
   value with markup in it: today that is the stored option values
-  (`SettingsPageTest`). Print a new one and it needs its own.
+  (`SettingsPageTest`, and `SettingsFieldTypesTest` for lists and texts) and a
+  multiselect's choices and group names from a callback
+  (`SettingsFieldTypesTest`). Print a new one and it needs its own.
 - Nonce + `current_user_can()` on anything that writes.
 - Every visible string inside `__()` / `esc_html__()` with the plugin text
   domain.
@@ -295,6 +299,23 @@ carries `'is_option' => false`. `Settings_Page::sanitize_submission()` checks
 that flag, and a test isolates it: without it a crafted post stores the section
 id as an option nothing reads.
 
+An option that holds a list - a `multiselect` - is read through
+`Settings::chosen()`, and one that holds a text - a `textarea` - through
+`Settings::text()`, each once, in `register()`. A row can hold anything.
+`chosen()` reads a non-array as the field's declared default, because it
+cannot be filtered at all (`array_filter()` on a string is a `TypeError` on a
+storefront page), while an empty array is a real choice - it is what
+`Settings_Page::sanitize_submission()` stores when nothing is selected. Then it
+keeps only strings, and only the ids the field's static `'options'` offer. A
+field whose choices come from its `'options_callback'` cannot be asked on a
+storefront request, so it declares an `'id_format'` - `Settings::DIGITS` for
+shipping method instance ids - and `chosen()` keeps the strings that match it,
+or nothing without one. Filtering per field, not against a union, is what
+keeps an id one list could never have offered from surviving a crafted post.
+`text()` reads anything but a string as the declared default, and an empty
+string as the cleared box it is. Their pure forms, `chosen_from()` and
+`text_from()`, are what the cases hand fields of their own.
+
 One switch per feature: never put two features behind one checkbox, because the
 screen exists to turn off the one that misbehaves and keep the rest. `'group'`
 is the small label the screen prints above a run of related switches. When an
@@ -314,7 +335,9 @@ Each `checkbox` says what it does in a few plain words (owner's request,
 one sentence saying what the owner or the shopper notices - no history,
 measurements or internals. The only caveats it keeps are the ones needed to
 decide: which pages to check where it can change a layout, and which switch it
-needs, named by that switch's title.
+needs, named by that switch's title. A `multiselect`'s `title` names what is
+picked and a `textarea`'s names what is written; each `desc` is one sentence
+of what the owner or the shopper notices, under the same rules.
 
 Do not add a switch that does nothing on the shops measured, however standard
 it is elsewhere, and measure again before relying on an old answer: check the
@@ -376,10 +399,23 @@ switch could only be overruled or disagree with it.
   scoped under `.rcus-settings`: stay inside WordPress's own design language,
   no framework and no React app for a form of switches. Checkboxes are drawn
   as switches but stay real checkboxes with `role="switch"`, so the page works
-  the same without the stylesheet. It knows three types: `title`, `sectionend`
-  and `checkbox`. Adding one means adding it to `Settings_Page::render_field()`
-  and `Settings_Page::sanitize_submission()` in the same change: a type one
-  knows and the other does not is either unsaveable or unsafe. The save reads
+  the same without the stylesheet. It knows five types: `title`,
+  `sectionend`, `checkbox`, `multiselect` and `textarea`. A `multiselect` is a
+  native `<select multiple>` named `id[]` with WooCommerce's
+  `wc-enhanced-select` class, which WooCommerce's own script turns into the
+  searchable box of its "Sell to specific countries" setting, each choice kept
+  as a chip with an x; without the script it is a native multiple select that
+  posts the same list. Its choices are static `'options'` - id => label, or a
+  group key => (id => label) drawn as an `<optgroup>`, which a
+  `'group_labels'` callback can name when the form draws it - or, for choices
+  that live in the database, an `'options_callback'` the form calls only when
+  it draws or saves the screen, never on a storefront request. A `textarea`
+  is one text, sanitized with `sanitize_textarea_field()` and printed with
+  `esc_textarea()`. A switch sits beside its text; a list or a text box goes
+  below it and fills the row (`.rcus-row--wide`). Adding a type means adding
+  it to `Settings_Page::render_field()` and
+  `Settings_Page::sanitize_submission()` in the same change: a type one knows
+  and the other does not is either unsaveable or unsafe. The save reads
   only the ids the field list declares, each through its own type's sanitizer,
   never the keys of `$_POST`, and only the fields the form says it drew
   (`Settings_Page::DRAWN_FIELD`). A post that lists nothing it drew is refused
@@ -393,6 +429,15 @@ switch could only be overruled or disagree with it.
   shell and stay even while the first is empty, so admin behaviour never
   starts by wiring a bundle. Empty scaffolding is fine; an example feature to
   delete is not.
+- On that page, and only where WooCommerce is supported,
+  `Assets::enqueue_admin()` also enqueues WooCommerce's own
+  `wc-enhanced-select` script and `woocommerce_admin_styles` stylesheet, the
+  selectWoo a `multiselect` needs, each only if `wp_script_is()` /
+  `wp_style_is()` says WooCommerce registered it, and before the bundle, so
+  this plugin's stylesheet comes after WooCommerce's. It runs at priority 20:
+  WooCommerce registers its admin stylesheet from an `admin_enqueue_scripts`
+  callback at 10 that it adds on `init`, after this plugin's, so at 10 there
+  was nothing registered yet.
 - The storefront has no bundle. What a feature prints there is inline, on a
   handle already on the page: `wp_add_inline_script()` on WooCommerce's
   `wc-checkout` or WeLaunch's `woocommerce-multi-inventory-public`

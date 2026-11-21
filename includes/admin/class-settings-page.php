@@ -16,9 +16,10 @@ defined( 'ABSPATH' ) || exit;
  *
  * The form draws its own fields: WC_Admin_Settings is the right tool on a shop
  * and does not exist anywhere else, and the plugin runs on plain WordPress too.
- * It knows three types - title, sectionend and checkbox - and adding one
- * means adding it to render_field() and to sanitize_submission() together; a
- * type one knows and the other does not is either unsaveable or unsafe.
+ * It knows five types: title, sectionend, checkbox, multiselect and textarea.
+ * Adding one means adding it to render_field() and to sanitize_submission()
+ * together; a type one knows and the other does not is either unsaveable or
+ * unsafe.
  *
  * The layout is the card-and-row pattern of @wordpress/components - the one
  * Site Health and the newer WooCommerce screens use - drawn in PHP and styled
@@ -26,8 +27,13 @@ defined( 'ABSPATH' ) || exit;
  * card, a field is a row with its title and one line of description on the
  * left and its control on the right. A checkbox is drawn as an on/off switch:
  * still a real checkbox, so the form posts exactly what it did, with
- * role="switch" for screen readers. Without the stylesheet everything degrades
- * to plain labels and checkboxes that work the same.
+ * role="switch" for screen readers. A multiselect and a textarea need the
+ * row's width, so their control goes below the text. The multiselect is a
+ * native multiple select with WooCommerce's wc-enhanced-select class, which
+ * WooCommerce's selectWoo, loaded by Assets, turns into a searchable box whose
+ * choices stay as chips with an x. Without the stylesheet and the script
+ * everything degrades to plain labels, checkboxes, a multiple select and a
+ * text box that post the same.
  */
 final class Settings_Page {
 
@@ -80,9 +86,7 @@ final class Settings_Page {
 			<?php
 			wp_nonce_field( self::SAVE_ACTION );
 
-			foreach ( Settings::available_fields() as $field ) {
-				$this->render_field( $field );
-			}
+			$this->render_fields( Settings::available_fields() );
 
 			// Without the empty name the button is called "submit", which
 			// shadows form.submit() for any script touching this form.
@@ -93,13 +97,28 @@ final class Settings_Page {
 	}
 
 	/**
+	 * Prints the rows of these fields, in order.
+	 *
+	 * Public so the cases can hand it fields no plugin ships, as they hand
+	 * Settings::fields_for_marks() theirs.
+	 *
+	 * @param array<int, array<string, mixed>> $fields Field definitions, in order.
+	 * @return void
+	 */
+	public function render_fields( array $fields ): void {
+		foreach ( $fields as $field ) {
+			$this->render_field( $field );
+		}
+	}
+
+	/**
 	 * Prints one row of the field list.
 	 *
 	 * A title opens a card and its matching sectionend closes it; a field
 	 * whose group differs from the one before it gets the group label first.
 	 * Every value printed here is escaped: titles and descriptions come from
 	 * the plugin, but the current value of an option comes from the database,
-	 * where anything can have been written.
+	 * where anything can have been written, and so may a callback's choices.
 	 *
 	 * @param array<string, mixed> $field One field definition.
 	 * @return void
@@ -134,7 +153,7 @@ final class Settings_Page {
 			return;
 		}
 
-		if ( '' === $id || 'checkbox' !== $type ) {
+		if ( '' === $id || ! in_array( $type, array( 'checkbox', 'multiselect', 'textarea' ), true ) ) {
 			return;
 		}
 
@@ -144,27 +163,164 @@ final class Settings_Page {
 
 		$this->group = $group;
 
-		$default = $field['default'] ?? '';
-		$value   = get_option( $id, $default );
-
+		// A switch sits beside its text; a list or a text box needs the row's
+		// width, so it goes below.
 		printf(
-			'<div class="rcus-row"><div class="rcus-row__text"><label class="rcus-row__label" for="%1$s">%2$s</label><p class="rcus-row__desc" id="%1$s-desc">%3$s</p></div><div class="rcus-row__control">',
+			'<div class="%4$s"><div class="rcus-row__text"><label class="rcus-row__label" for="%1$s">%2$s</label><p class="rcus-row__desc" id="%1$s-desc">%3$s</p></div><div class="rcus-row__control">',
 			esc_attr( $id ),
 			esc_html( $title ),
-			esc_html( $desc )
+			esc_html( $desc ),
+			'checkbox' === $type ? 'rcus-row' : 'rcus-row rcus-row--wide'
 		);
 
-		printf(
-			'<input type="checkbox" role="switch" class="rcus-switch" id="%1$s" name="%1$s" value="yes" aria-describedby="%1$s-desc"%2$s/>',
-			esc_attr( $id ),
-			'yes' === $value ? ' checked="checked"' : ''
-		);
+		if ( 'checkbox' === $type ) {
+			$this->render_checkbox( $field, $id );
+		} elseif ( 'multiselect' === $type ) {
+			$this->render_multiselect( $field, $id );
+		} else {
+			$this->render_textarea( $field, $id );
+		}
 
 		printf(
 			'<input type="hidden" name="%1$s[]" value="%2$s"/></div></div>',
 			esc_attr( self::DRAWN_FIELD ),
 			esc_attr( $id )
 		);
+	}
+
+	/**
+	 * Prints a checkbox, drawn as an on/off switch.
+	 *
+	 * @param array<string, mixed> $field One field definition.
+	 * @param string               $id    Option id.
+	 * @return void
+	 */
+	private function render_checkbox( array $field, string $id ): void {
+		$value = get_option( $id, $field['default'] ?? '' );
+
+		printf(
+			'<input type="checkbox" role="switch" class="rcus-switch" id="%1$s" name="%1$s" value="yes" aria-describedby="%1$s-desc"%2$s/>',
+			esc_attr( $id ),
+			'yes' === $value ? ' checked="checked"' : ''
+		);
+	}
+
+	/**
+	 * Prints a multiselect: a native multiple select that selectWoo enhances.
+	 *
+	 * The wc-enhanced-select class is what WooCommerce's own script looks for,
+	 * and data-placeholder what it shows in the empty box. A group of choices
+	 * is an optgroup, labelled by the field's 'group_labels' callback or else
+	 * by its key. What is selected is what Settings::chosen() would read from
+	 * the row, so the screen shows what the plugin acts on; the stored value
+	 * itself is only compared, never printed, so markup written into the row
+	 * cannot reach the page.
+	 *
+	 * @param array<string, mixed> $field One field definition.
+	 * @param string               $id    Option id.
+	 * @return void
+	 */
+	private function render_multiselect( array $field, string $id ): void {
+		$stored = Settings::chosen_from( $field, get_option( $id, null ) );
+		$labels = self::group_labels( $field );
+
+		printf(
+			'<select multiple="multiple" class="wc-enhanced-select rcus-select" id="%1$s" name="%1$s[]" data-placeholder="%2$s" aria-describedby="%1$s-desc">',
+			esc_attr( $id ),
+			esc_attr( is_string( $field['placeholder'] ?? null ) ? $field['placeholder'] : '' )
+		);
+
+		foreach ( self::choices( $field ) as $key => $entry ) {
+			if ( ! is_array( $entry ) ) {
+				self::render_option( (string) $key, $entry, $stored );
+
+				continue;
+			}
+
+			printf( '<optgroup label="%s">', esc_attr( is_string( $labels[ $key ] ?? null ) ? $labels[ $key ] : (string) $key ) );
+
+			foreach ( $entry as $choice => $label ) {
+				self::render_option( (string) $choice, $label, $stored );
+			}
+
+			echo '</optgroup>';
+		}
+
+		echo '</select>';
+	}
+
+	/**
+	 * Prints one choice of a multiselect.
+	 *
+	 * @param string             $choice Choice id.
+	 * @param mixed              $label  Its label; the id stands in for one that is not a string.
+	 * @param array<int, string> $stored The ids selected.
+	 * @return void
+	 */
+	private static function render_option( string $choice, mixed $label, array $stored ): void {
+		printf(
+			'<option value="%1$s"%3$s>%2$s</option>',
+			esc_attr( $choice ),
+			esc_html( is_string( $label ) ? $label : $choice ),
+			in_array( $choice, $stored, true ) ? ' selected="selected"' : ''
+		);
+	}
+
+	/**
+	 * Prints a textarea holding what Settings::text() would read from the row.
+	 *
+	 * The one stored value this screen prints, so it goes through
+	 * esc_textarea(): markup written into the row shows as text in the box,
+	 * and cannot close it.
+	 *
+	 * @param array<string, mixed> $field One field definition.
+	 * @param string               $id    Option id.
+	 * @return void
+	 */
+	private function render_textarea( array $field, string $id ): void {
+		printf(
+			'<textarea rows="3" class="large-text" id="%1$s" name="%1$s" aria-describedby="%1$s-desc">%2$s</textarea>',
+			esc_attr( $id ),
+			esc_textarea( Settings::text_from( $field, get_option( $id, null ) ) )
+		);
+	}
+
+	/**
+	 * A multiselect's choices as the form offers them: id => label, or a group key => (id => label).
+	 *
+	 * A field whose choices live in the database names an 'options_callback',
+	 * which is called here and only here, when the screen is drawn or saved:
+	 * a storefront request reads the row through Settings::chosen(), which
+	 * never calls it. Any other field offers its static 'options'.
+	 *
+	 * @param array<string, mixed> $field One field definition.
+	 * @return array<mixed>
+	 */
+	private static function choices( array $field ): array {
+		if ( isset( $field['options_callback'] ) ) {
+			$callback = $field['options_callback'];
+			$choices  = is_callable( $callback ) ? $callback() : null;
+		} else {
+			$choices = $field['options'] ?? null;
+		}
+
+		return is_array( $choices ) ? $choices : array();
+	}
+
+	/**
+	 * Group key => the label its optgroup shows, from the field's 'group_labels' callback.
+	 *
+	 * Called only when the screen is drawn, for names that come from
+	 * elsewhere, such as WooCommerce's names of a country's regions.
+	 *
+	 * @param array<string, mixed> $field One field definition.
+	 * @return array<mixed>
+	 */
+	private static function group_labels( array $field ): array {
+		$callback = $field['group_labels'] ?? null;
+		$labels   = is_callable( $callback ) ? $callback() : null;
+
+		return is_array( $labels ) ? $labels : array();
 	}
 
 	/**
@@ -285,11 +441,14 @@ final class Settings_Page {
 	 * is never read, so a crafted post cannot create an option. Structural rows
 	 * are skipped by the same 'is_option' flag the field list sets. A checkbox
 	 * that is absent was unchecked, because browsers send nothing for an
-	 * unchecked box.
+	 * unchecked box; a multiselect with nothing selected is likewise absent,
+	 * and stores the empty list. A multiselect keeps only the ids its field
+	 * offers now - its callback's, for one whose choices live in the database -
+	 * and a textarea is stored as plain text, line breaks kept.
 	 *
 	 * @param array<int, array<string, mixed>> $fields Field definitions.
 	 * @param array<mixed>                     $posted The unslashed submission.
-	 * @return array<string, string> Option id => value to store.
+	 * @return array<string, string|array<int, string>> Option id => value to store.
 	 */
 	public static function sanitize_submission( array $fields, array $posted ): array {
 		$values = array();
@@ -302,9 +461,22 @@ final class Settings_Page {
 				continue;
 			}
 
+			$raw = $posted[ $id ] ?? null;
+
 			if ( 'checkbox' === $type ) {
-				$raw           = $posted[ $id ] ?? null;
 				$values[ $id ] = is_string( $raw ) && 'yes' === $raw ? 'yes' : 'no';
+			}
+
+			if ( 'multiselect' === $type ) {
+				// Only the ids this field offers, each once: anything else in the
+				// list was not a choice on this form.
+				$values[ $id ] = is_array( $raw )
+					? array_values( array_unique( array_intersect( array_filter( $raw, 'is_string' ), Settings::choice_ids( self::choices( $field ) ) ) ) )
+					: array();
+			}
+
+			if ( 'textarea' === $type ) {
+				$values[ $id ] = is_string( $raw ) ? sanitize_textarea_field( $raw ) : '';
 			}
 		}
 

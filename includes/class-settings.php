@@ -49,6 +49,15 @@ final class Settings {
 	const string NEEDS_COUPON_ITEMS = 'coupon_items';
 
 	/**
+	 * An 'id_format': ids that are strings of digits, as WooCommerce's shipping method instance ids are.
+	 *
+	 * A list whose choices come from a callback cannot be checked against
+	 * them on a storefront request, so chosen() checks each id against its
+	 * field's format instead.
+	 */
+	const string DIGITS = '/\A[0-9]+\z/';
+
+	/**
 	 * Keys of the switches removed outright, without the prefix.
 	 *
 	 * A switch removed with nothing to inherit it goes here, so its row stays
@@ -83,6 +92,15 @@ final class Settings {
 	 *
 	 * 'group' is the small label the screen prints above a run of related
 	 * switches inside a section; consecutive fields share one label.
+	 *
+	 * A 'multiselect' stores a list of string ids, read through chosen(). Its
+	 * choices are 'options' - id => label, or a group key => (id => label),
+	 * drawn as an optgroup that a 'group_labels' callback can name when the
+	 * form draws it - or, for choices that live in the database, an
+	 * 'options_callback' only the form calls, when it draws or saves the
+	 * screen; such a field declares an 'id_format' (DIGITS) for chosen() to
+	 * check ids by. 'placeholder' is what its empty box says. A 'textarea'
+	 * stores one text, read through text().
 	 *
 	 * The structural rows carry 'is_option' => false, which is the flag
 	 * Settings_Page::sanitize_submission() checks. Without it a crafted post
@@ -507,6 +525,146 @@ final class Settings {
 		}
 
 		return array_values( array_unique( $retired ) );
+	}
+
+	/**
+	 * One stored list, filtered to the ids its own field can produce.
+	 *
+	 * Read it once per request, in register(): it runs on storefront requests,
+	 * so it takes whatever the row holds. See chosen_from() for the rules.
+	 *
+	 * @param string $key Option key without the prefix.
+	 * @return array<int, string>
+	 */
+	public static function chosen( string $key ): array {
+		return self::chosen_from( self::field( self::OPTION_PREFIX . $key ), self::get( $key, null ) );
+	}
+
+	/**
+	 * What a list field's row holds, filtered to the ids that field can produce.
+	 *
+	 * A value that is not an array - a row never saved, a corrupt row, another
+	 * plugin writing the option - cannot be filtered at all, since
+	 * array_filter() on a string is a TypeError on every page of the shop, so
+	 * it reads as whatever the field declares. An empty array is a real choice:
+	 * it is what Settings_Page::sanitize_submission() stores when nothing is
+	 * selected.
+	 *
+	 * Each element must then be a string - an element can be anything, and
+	 * casting an array to string is a warning on a storefront page - and one of
+	 * the field's static 'options'. A field whose choices come from its
+	 * 'options_callback' cannot be asked: the callback may read the database,
+	 * and this runs on storefront requests, so its ids are checked against the
+	 * field's 'id_format' instead, and without one nothing passes. Each list is
+	 * checked against its own field, so an id that field could never have
+	 * offered does not survive a crafted post.
+	 *
+	 * Pure, so the cases can hand it fields no plugin ships.
+	 *
+	 * @param array<string, mixed> $field  One field definition.
+	 * @param mixed                $stored What its row holds; null for a row never saved.
+	 * @return array<int, string>
+	 */
+	public static function chosen_from( array $field, mixed $stored ): array {
+		if ( ! is_array( $stored ) ) {
+			$stored = $field['default'] ?? array();
+		}
+
+		if ( ! is_array( $stored ) ) {
+			return array();
+		}
+
+		$ids = array_filter( $stored, 'is_string' );
+
+		if ( isset( $field['options_callback'] ) ) {
+			$format = is_string( $field['id_format'] ?? null ) ? $field['id_format'] : '';
+			$ids    = '' === $format ? array() : array_filter( $ids, static fn ( string $id ): bool => 1 === preg_match( $format, $id ) );
+		} else {
+			$ids = array_intersect( $ids, self::choice_ids( is_array( $field['options'] ?? null ) ? $field['options'] : array() ) );
+		}
+
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
+	 * Every id a list's choices offer, as strings, the grouped ones included.
+	 *
+	 * Choices are id => label, or a group key => (id => label); the group key
+	 * itself is no id. PHP turns a numeric id into an integer key, so each is
+	 * read back as a string, which is what a post and a row hold.
+	 *
+	 * @param array<mixed> $choices A field's choices.
+	 * @return array<int, string>
+	 */
+	public static function choice_ids( array $choices ): array {
+		$ids = array();
+
+		foreach ( $choices as $key => $entry ) {
+			if ( ! is_array( $entry ) ) {
+				$ids[] = (string) $key;
+
+				continue;
+			}
+
+			foreach ( array_keys( $entry ) as $id ) {
+				$ids[] = (string) $id;
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * One stored text, or its field's declared default while the row holds no string.
+	 *
+	 * Read it once per request, in register(). See text_from() for the rules.
+	 *
+	 * @param string $key Option key without the prefix.
+	 * @return string
+	 */
+	public static function text( string $key ): string {
+		return self::text_from( self::field( self::OPTION_PREFIX . $key ), self::get( $key, null ) );
+	}
+
+	/**
+	 * What a text field's row holds, or that field's declared default.
+	 *
+	 * A row never saved, or one holding anything but a string - an array, a
+	 * number another plugin wrote - reads as the declared default, so nothing
+	 * downstream prints an array or casts one. An empty string is a real
+	 * choice: the box was cleared.
+	 *
+	 * Pure, so the cases can hand it fields no plugin ships.
+	 *
+	 * @param array<string, mixed> $field  One field definition.
+	 * @param mixed                $stored What its row holds; null for a row never saved.
+	 * @return string
+	 */
+	public static function text_from( array $field, mixed $stored ): string {
+		if ( is_string( $stored ) ) {
+			return $stored;
+		}
+
+		$default = $field['default'] ?? '';
+
+		return is_string( $default ) ? $default : '';
+	}
+
+	/**
+	 * The declaration of one option, or an empty array when no field has that id.
+	 *
+	 * @param string $id Option id, prefix included.
+	 * @return array<string, mixed>
+	 */
+	private static function field( string $id ): array {
+		foreach ( self::fields() as $field ) {
+			// The structural rows share their ids: a card's title and its end.
+			if ( isset( $field['id'] ) && $id === $field['id'] && false !== ( $field['is_option'] ?? true ) ) {
+				return $field;
+			}
+		}
+
+		return array();
 	}
 
 	/**

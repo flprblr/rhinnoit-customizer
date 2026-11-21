@@ -119,6 +119,10 @@ final class WP_Stub {
 	public static array $inline_at = array();
 	/** @var array<int, string> Style handles registered and enqueued, in order. */
 	public static array $styles = array();
+	/** @var array<int, string> Script handles another plugin registered, for wp_script_is(). */
+	public static array $registered_scripts = array();
+	/** @var array<int, string> Style handles another plugin registered, for wp_style_is(). */
+	public static array $registered_styles = array();
 	/** @var array<string, string> Inline CSS by handle. */
 	public static array $inline_styles = array();
 	/** @var array<int, string> */
@@ -255,6 +259,8 @@ final class WP_Stub {
 		self::$inline_at  = array();
 		self::$styles        = array();
 		self::$inline_styles = array();
+		self::$registered_scripts = array();
+		self::$registered_styles  = array();
 		self::$logs       = array();
 		self::$hooks      = array();
 		self::$callbacks  = array();
@@ -345,8 +351,10 @@ function wp_list_pluck( $input_list, $field ) { return array_map( static fn ( $i
 function get_page_uri( $page = 0 ) { return WP_Stub::$page_uris[ (int) $page ] ?? false; }
 
 function wp_json_encode( $data ) { return WP_Stub::$json_fails ? false : json_encode( $data ); }
-function wp_enqueue_script( $handle, $src, $deps, $ver, $args ) { WP_Stub::$enqueued[] = compact( 'handle', 'deps', 'ver' ); }
+function wp_enqueue_script( $handle, $src = '', $deps = array(), $ver = false, $args = array() ) { WP_Stub::$enqueued[] = compact( 'handle', 'deps', 'ver' ); }
 function wp_enqueue_style( $handle, $src = '', $deps = array(), $ver = false ) { WP_Stub::$styles[] = 'enqueue:' . $handle; }
+function wp_script_is( $handle, $status = 'enqueued' ) { return 'registered' === $status ? in_array( $handle, WP_Stub::$registered_scripts, true ) : in_array( $handle, array_column( WP_Stub::$enqueued, 'handle' ), true ); }
+function wp_style_is( $handle, $status = 'enqueued' ) { return 'registered' === $status ? in_array( $handle, WP_Stub::$registered_styles, true ) : in_array( 'enqueue:' . $handle, WP_Stub::$styles, true ); }
 function wp_register_style( $handle, $src, $deps = array(), $ver = false ) { WP_Stub::$styles[] = 'register:' . $handle . ':' . var_export( $src, true ); return true; }
 /**
  * Core's srcset for a size, with what Porto's wp_calculate_image_srcset trim does to it.
@@ -394,7 +402,10 @@ function wp_doing_ajax() { return WP_Stub::$doing_ajax; }
 function is_user_logged_in() { return WP_Stub::$logged_in; }
 function home_url( $path = '' ) { return rtrim( WP_Stub::$home_url, '/' ) . '/' . ltrim( (string) $path, '/' ); }
 function rest_get_url_prefix() { return 'wp-json'; }
-function sanitize_text_field( $str ) { return trim( strip_tags( (string) $str ) ); }
+// As core: both strip the tags, and only the textarea one keeps the line breaks.
+function sanitize_text_field( $str ) { return trim( (string) preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $str ) ) ); }
+function sanitize_textarea_field( $str ) { return trim( strip_tags( (string) $str ) ); }
+function esc_textarea( $text ) { return htmlspecialchars( (string) $text, ENT_QUOTES ); }
 function esc_url_raw( $url ) { return str_replace( array( '"', '<', '>', ' ' ), '', (string) $url ); }
 
 /** The parent theme's directory: Porto's, unless the process runs with RCUS_TESTS_PORTO=none. */

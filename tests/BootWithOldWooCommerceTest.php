@@ -12,10 +12,12 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Menu;
+use RhinnoIT\Customizer\Assets;
 use RhinnoIT\Customizer\Plugin;
 use RhinnoIT\Customizer\Settings;
 
 #[CoversClass( Plugin::class )]
+#[CoversClass( Assets::class )]
 final class BootWithOldWooCommerceTest extends TestCase {
 
 	public static function setUpBeforeClass(): void {
@@ -50,5 +52,26 @@ final class BootWithOldWooCommerceTest extends TestCase {
 		// Supported decides what the plugin does with WooCommerce; active
 		// decides only what exists. An old version is the one place they differ.
 		$this->assertSame( 'manage_woocommerce', Menu::capability(), 'Shop managers keep the page: WooCommerce is there, just old.' );
+	}
+
+	/**
+	 * WooCommerce's selectWoo stays off the screen, though this WooCommerce registered it.
+	 *
+	 * Only the WooCommerce card can hold a multiselect, and it is not drawn on
+	 * a version the plugin does not support.
+	 *
+	 * @return void
+	 */
+	#[RunInSeparateProcess]
+	public function test_an_unsupported_woocommerce_gets_no_select_on_the_screen(): void {
+		WP_Stub::reset();
+		WP_Stub::$registered_scripts = array( 'wc-enhanced-select' );
+		WP_Stub::$registered_styles  = array( 'woocommerce_admin_styles' );
+		$_GET                        = array( 'page' => Menu::PAGE_SLUG );
+
+		( new Assets() )->enqueue_admin();
+
+		$this->assertNotContains( 'wc-enhanced-select', array_column( WP_Stub::$enqueued, 'handle' ) );
+		$this->assertNotContains( 'enqueue:woocommerce_admin_styles', WP_Stub::$styles );
 	}
 }

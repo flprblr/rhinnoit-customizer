@@ -52,7 +52,7 @@ includes/
 ├── class-plugin.php            Container: the screen always, every service where WooCommerce is supported
 ├── class-install.php           Default options on activation and update, and the copy of WP Optimizer's
 ├── class-settings.php          Declaration and reading of the options
-├── class-assets.php            build/ enqueueing (the admin script and style)
+├── class-assets.php            build/ enqueueing (the admin script and style), and WooCommerce's selectWoo beside it
 ├── class-logger.php            wc_get_logger() wrapper, PHP's error log without it; throttled write
 ├── frontend/                   The WooCommerce half: every service
 │   ├── class-widget-thumbnail.php      A srcset for Porto's product widget thumbnails
@@ -274,9 +274,10 @@ out:
 
 - The two storefront lists, `rcus_scope_wordpress` and
   `rcus_scope_woocommerce`, with `Settings::wordpress_scope_choices()`,
-  `woocommerce_scope_choices()`, `frontend_contexts()` and `chosen()`, and the
+  `woocommerce_scope_choices()` and `frontend_contexts()`, and the
   `multicheck` type that drew them (`Settings_Page::render_multicheck()` and
-  `.rcus-group__desc`).
+  `.rcus-group__desc`). `chosen()` went with them and came back adapted, as
+  the reader of the `multiselect` type (see *Admin interface*).
 - The storefront bundle: `src/frontend.js`, `src/frontend.scss`,
   `Assets::enqueue_frontend()`, `scope_matches()` and `is_plain_page()`, the
   `$extra_deps` parameter of `Assets::enqueue()`, and the
@@ -364,16 +365,38 @@ site without WooCommerce. It uses the card-and-row pattern of
 `@wordpress/components` (the look of Site Health and the newer WooCommerce
 screens) in plain PHP markup, styled by `src/admin.scss`: a card per section,
 small group labels inside it, and a row per setting with its title and one line
-of description on the left and an on/off switch on the right. The switches are
-real checkboxes with `role="switch"`, so the form posts the same thing with or
-without the stylesheet, and no JavaScript is involved. It knows three types:
-`title`, `sectionend` and `checkbox` (the template's fourth, `multicheck`, went
-with the storefront lists). A new one goes into `Settings_Page::render_field()`
-and `Settings_Page::sanitize_submission()` together. The save reads only the ids
+of description on the left and an on/off switch on the right; a list or a text
+box goes below its text and fills the row. The switches are real checkboxes
+with `role="switch"`, so the form posts the same thing with or without the
+stylesheet. It knows five types: `title`, `sectionend`, `checkbox`,
+`multiselect` and `textarea` (the template's `multicheck` went with the
+storefront lists). A new one goes into `Settings_Page::render_field()` and
+`Settings_Page::sanitize_submission()` together. The save reads only the ids
 the field list declares, each through its own type's sanitizer, so a crafted
 post cannot create an option - and only the fields the form says it drew, so a
 section that appeared while the form was open (WooCommerce activated in another
 tab) is not saved as all unchecked.
+
+A `multiselect` is a native multiple select with WooCommerce's
+`wc-enhanced-select` class, so WooCommerce's selectWoo, which `Assets` loads on
+this screen where WooCommerce is supported, makes it the box of WooCommerce's
+"Sell to specific countries" setting: searchable, every choice kept as a chip
+with an x. Without that script it stays a native multiple select that posts
+the same list, and nothing selected posts nothing, which stores the empty list.
+Its choices are fixed `'options'`, optionally grouped into `<optgroup>`s that a
+`'group_labels'` callback names when the screen is drawn, or come from an
+`'options_callback'` for choices that live in the database, such as shipping
+methods: the form calls it only when the screen is drawn or saved, and the save
+keeps only the ids it offers then. The row is a list of string ids, read back
+through `Settings::chosen()`, which keeps only the strings its field can
+produce - one of its `'options'`, or for a callback's list one matching the
+field's `'id_format'` (`Settings::DIGITS`), since a storefront request never
+asks the callback. A `textarea` stores one text through
+`sanitize_textarea_field()`, line breaks kept, and is read back through
+`Settings::text()`. Either reader takes a row of the wrong type as its field's
+declared default. A `multiselect`'s title names what is picked and a
+`textarea`'s what is written, each with one sentence of what the owner or the
+shopper notices.
 
 The form posts to `admin-post.php` with a nonce and a check of
 `Menu::capability()`: `manage_woocommerce` where WooCommerce is active, shared
@@ -649,6 +672,8 @@ without WooCommerce, so those paths are hardened:
 | `wp_json_encode()` fails                     | Inline script skipped, no broken JS emitted |
 | `?page[]=x` (array in the query string)      | The plugin page simply does not match      |
 | Switch holds a non-string value              | Reads as off; no cast, no `TypeError`      |
+| A list or a text holds another type          | Reads as its declared default; no cast, no `TypeError` |
+| WooCommerce's selectWoo not registered       | A multiselect stays a native multiple select that saves the same |
 | No WooCommerce (plain WordPress)             | The screen with the master switch alone; the other options kept, not read |
 | WooCommerce below the minimum               | The same, and a warning to admins          |
 | WP Optimizer still active                    | Nothing but a notice to admins; activation still copies its settings |
@@ -669,6 +694,13 @@ on that screen only (`Menu::is_current_page()`). `Assets::enqueue()` reads
 `build/admin.asset.php` for the dependencies and the version, and validates it:
 a half-uploaded build degrades to "no script" and logs once, never to a fatal
 error.
+
+Before the bundle, where WooCommerce is supported, the screen also gets
+WooCommerce's own `wc-enhanced-select` script and `woocommerce_admin_styles`
+stylesheet, the selectWoo its multiselects need, each only if WooCommerce
+registered it. Both go in at priority 20 of `admin_enqueue_scripts`:
+WooCommerce registers its admin stylesheet from a callback at 10 that it adds
+on `init`, after this plugin's, so at 10 there was nothing to enqueue yet.
 
 What the features print on the storefront is inline, on a handle that is
 already on the page, so it costs no request and loads only where what it

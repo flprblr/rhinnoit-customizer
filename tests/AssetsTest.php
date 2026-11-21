@@ -4,7 +4,7 @@
  *
  * The manifest cases were real fatal errors before it was validated, and the
  * helper they exercise is the one every bundle goes through; the rest pin
- * where the bundle is allowed to load.
+ * where the bundle is allowed to load, and WooCommerce's selectWoo with it.
  *
  * @package RhinnoIT\Customizer
  */
@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Menu;
 use RhinnoIT\Customizer\Assets;
+use RhinnoIT\Customizer\Plugin;
 
 #[CoversClass( Assets::class )]
 final class AssetsTest extends TestCase {
@@ -164,5 +165,89 @@ final class AssetsTest extends TestCase {
 
 		$handles = array_column( WP_Stub::$enqueued, 'handle' );
 		$this->assertNotContains( 'rcus-admin:i18n', $handles );
+	}
+
+	/**
+	 * WooCommerce's selectWoo loads on this screen, before the bundle.
+	 *
+	 * The handles WooCommerce's settings screens enhance a multiselect with, so
+	 * this plugin's stylesheet, printed after WooCommerce's, has the last word.
+	 *
+	 * @return void
+	 */
+	public function test_woocommerces_select_loads_on_this_screen_before_the_bundle(): void {
+		$this->assertTrue( Plugin::woocommerce_is_supported(), 'The shared process runs a supported WooCommerce, or this case means nothing.' );
+
+		$_GET                        = array( 'page' => Menu::PAGE_SLUG );
+		WP_Stub::$registered_scripts = array( 'wc-enhanced-select' );
+		WP_Stub::$registered_styles  = array( 'woocommerce_admin_styles' );
+
+		$this->manifest( "array( 'dependencies' => array(), 'version' => 'abc' )" );
+		file_put_contents( RCUS_PATH . 'build/admin.css', '' );
+
+		( new Assets() )->enqueue_admin();
+
+		$this->assertSame( array( 'wc-enhanced-select', 'rcus-admin' ), array_column( WP_Stub::$enqueued, 'handle' ) );
+		$this->assertSame( array( 'enqueue:woocommerce_admin_styles', 'enqueue:rcus-admin' ), WP_Stub::$styles );
+	}
+
+	/**
+	 * Nowhere else: admin_enqueue_scripts fires on every admin screen, WooCommerce's own included.
+	 *
+	 * @return void
+	 */
+	public function test_woocommerces_select_loads_on_no_other_screen(): void {
+		WP_Stub::$registered_scripts = array( 'wc-enhanced-select' );
+		WP_Stub::$registered_styles  = array( 'woocommerce_admin_styles' );
+
+		foreach ( array( 'wc-settings', 'edit.php', '' ) as $page ) {
+			$_GET['page'] = $page;
+
+			( new Assets() )->enqueue_admin();
+		}
+
+		$this->assertSame( array(), WP_Stub::$enqueued );
+		$this->assertSame( array(), WP_Stub::$styles );
+	}
+
+	/**
+	 * A handle WooCommerce did not register is left out, and the select stays a native one.
+	 *
+	 * @return void
+	 */
+	public function test_a_handle_woocommerce_did_not_register_is_left_out(): void {
+		$_GET = array( 'page' => Menu::PAGE_SLUG );
+
+		WP_Stub::$registered_scripts = array( 'wc-enhanced-select' );
+
+		( new Assets() )->enqueue_admin();
+
+		$this->assertSame( array( 'wc-enhanced-select' ), array_column( WP_Stub::$enqueued, 'handle' ) );
+		$this->assertSame( array(), WP_Stub::$styles, 'No stylesheet registered, none enqueued.' );
+
+		WP_Stub::$enqueued           = array();
+		WP_Stub::$registered_scripts = array();
+		WP_Stub::$registered_styles  = array( 'woocommerce_admin_styles' );
+
+		( new Assets() )->enqueue_admin();
+
+		$this->assertSame( array(), WP_Stub::$enqueued, 'No script registered, none enqueued.' );
+		$this->assertSame( array( 'enqueue:woocommerce_admin_styles' ), WP_Stub::$styles );
+	}
+
+	/**
+	 * The screen's assets are enqueued once WooCommerce has registered its own.
+	 *
+	 * WooCommerce registers woocommerce_admin_styles from an
+	 * admin_enqueue_scripts callback at 10 that it adds on init, after this
+	 * plugin's, so at 10 the check ran first, found nothing registered, and
+	 * the box was never drawn as WooCommerce's.
+	 *
+	 * @return void
+	 */
+	public function test_the_screen_enqueues_after_woocommerce_registers(): void {
+		( new Assets() )->register();
+
+		$this->assertGreaterThan( 10, WP_Stub::$priorities['admin_enqueue_scripts:enqueue_admin'] ?? 10 );
 	}
 }
