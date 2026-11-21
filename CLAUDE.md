@@ -10,10 +10,19 @@ Its features come from RHINNO IT - WP Optimizer 2.8.13
 (`rhinnoit-wp-optimizer`, prefixes `RWPO_` / `rwpo_`, namespace
 `RhinnoIT\WpOptimizer`), which was split in two: this plugin took the cart,
 checkout, order and store features, and RHINNO IT - Optimizer the delivery and
-page cache ones. Each feature file is WP Optimizer's, byte for byte, with the
-identity renamed and two kinds of hand edit: the copies of the WooCommerce
-names the Optimizer also holds (see Layout), and the keys that keep WP
-Optimizer's spelling on purpose (see Prefixes).
+page cache ones. Each of those feature files is WP Optimizer's, byte for byte,
+with the identity renamed and two kinds of hand edit: the copies of the
+WooCommerce names the Optimizer also holds (see Layout), and the keys that keep
+WP Optimizer's spelling on purpose (see Prefixes). The exception is
+`Commune_Select`, which 1.1.0 gave `region_names()`, for the screen's commune
+lists.
+
+1.1.0 added four features of this plugin's own, built on the ideas of four
+older plugins of the owner's, which it replaces: `Rut_Validation`,
+`Birthdate_Style`, and the two shipping rules, `Shipping_Block` and
+`Shipping_Exclusion`, with the helper they share, `Shipping_Communes`. Only
+the ideas were taken, never the code. See Communes, shipping rules and
+checkout fields below, and *Replacing the old plugins* in the README.
 
 Everything in this repository is written in English: code, comments, docblocks,
 UI strings and documentation.
@@ -515,6 +524,72 @@ reached from there has to fail soft:
   mode instead; swallowing errors only moves the breakage somewhere harder to
   find.
 
+## Communes, shipping rules and checkout fields
+
+The four features of 1.1.0 live by these rules:
+
+- Chile's communes exist once, in `Frontend\Commune_Select::COMMUNES`: the 346
+  official names, keyed by WooCommerce's 16 region codes. The checkout's
+  dropdown offers them, and `Settings::fields()` builds both shipping rules'
+  lists from them - each name its own id, grouped by region and headed with
+  WooCommerce's names through `Commune_Select::region_names()` - so where the
+  dropdown shows, the city a package ships to is one of the names a rule can
+  hold. Never write a second list, or a commune into code. A commune created
+  or renamed by law changes there and only there (`CommuneSelectTest` and
+  `ShippingSettingsTest` count the 346); a renamed one drops out of every
+  saved list, since `chosen()` keeps only the ids its field offers, so the
+  release has to say that the shops which had picked it pick it again.
+- A package matches by its city alone (`Shipping_Communes::matches()`), both
+  sides normalized by `Shipping_Communes::normalize()`; the region is never
+  compared. Both rules ask `Shipping_Communes`, never a copy of their own.
+- Nothing a rule acts on is written in code - no method, instance id or
+  commune - and its message is the owner's, over a translated default: the
+  old plugins wrote all of it there, and another zone or another shop meant
+  editing them. The owner picks them on the screen. A method is stored by its
+  instance id, so renaming it changes nothing.
+- **Stop deliveries to some communes** keeps exactly the rates whose method id
+  is in `Shipping_Exclusion::PICKUP` - WooCommerce's `local_pickup` and the
+  block checkout's `pickup_location` - and takes every other rate, whatever
+  zone or plugin offers it (owner's decision, 2026-11-21: only deliveries go,
+  store pickup stays). A pickup method another plugin registers under an id of
+  its own is a delivery to the rule until that id is added there, with a case.
+- Both rules filter `woocommerce_package_rates` at `PHP_INT_MAX`, after the
+  couriers' plugins. WooCommerce keeps the rates it calculated in each
+  shopper's session, keyed by its `shipping` transient version, so every save
+  of the screen bumps that version: `Shipping_Communes::refresh_rates()` on
+  `Shipping_Communes::SAVED` (see Interface), hooked by both services before
+  they read their switch. Keep it unconditional - the save that turns a rule
+  off has to free the rates it hid - and make anything else that ever writes
+  these options (a migration, an import) bump it too, with
+  `WC_Cache_Helper::get_transient_version( 'shipping', true )`.
+- Choices that live in the database - today every zone's shipping methods,
+  `Shipping_Block::method_choices()` - are built only when the screen draws or
+  saves: they come from a field's `'options_callback'`, which only
+  `Settings_Page` calls, and `Settings::chosen()` checks the stored ids by the
+  field's `'id_format'` instead. A storefront request never lists the zones;
+  the message row asks WooCommerce for the one zone its package matches, as
+  WooCommerce itself does to rate it. `ShippingSettingsTest` and
+  `ShippingBlockTest` count the listings (`WP_Stub::$zone_listings`). A
+  `'group_labels'` callback, too, runs only when the screen draws.
+- `billing_rut`, its Chilean/foreigner radio `billing_is_chilean` and
+  `billing_birthdate` belong to another plugin, which adds them to the checkout
+  (owner's decision, 2026-11-21). This plugin never creates, removes or
+  reorders them, and never ticks the radio: `Rut_Validation` takes only
+  `billing_rut`'s `required` flag and `validate-required` class (what the flag
+  said stays as `data-rcus-required`, and its script keeps the label's
+  required mark true), formats and validates it, and empties and disables it
+  for a foreigner; `Birthdate_Style` only styles `billing_birthdate`. Each does
+  nothing on a checkout without its field. Their switches are offered
+  wherever their card is, since no mark can tell what another plugin's
+  checkout holds. The radio's value is read through `Rut_Validation::choice()`
+  (and the script's `n()`, which mirrors it), never compared raw.
+- These features act on the classic (shortcode) checkout, which the shops use:
+  the RUT check, the birth date field, and the shipping rules' message and
+  submit check. The block checkout draws its own fields and runs none of their
+  hooks, so there they do nothing and break nothing, and
+  `cart_checkout_blocks` stays declared compatible. The rules' rates go on
+  both, since `woocommerce_package_rates` serves both.
+
 ## WP Optimizer
 
 Every shop this plugin goes on ran WP Optimizer first. Two pieces hand it
@@ -548,7 +623,9 @@ now (see Prefixes).
 - Do not key a feature to a product, a store id, a page id or a file name.
   Rules are structural - the cart's own lines, the store WeLaunch names as
   delivery or default, the queried product - so they hold when the shop's
-  content changes and nobody has to re-apply anything.
+  content changes and nobody has to re-apply anything. What the owner picks on
+  the screen is the one exception: the shipping rules act on the methods and
+  communes chosen there, never on ones written in code.
 - Do not add abstraction layers for a single use case.
 - Do not use `admin-ajax` when the REST API solves the case.
 - Do not query the database directly when a WordPress or WooCommerce API
