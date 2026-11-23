@@ -2,7 +2,7 @@
 /**
  * Plugin Name:          RHINNO IT - Customizer
  * Description:          Adjusts the WooCommerce cart, checkout, orders and store pickup.
- * Version:              1.0.0
+ * Version:              2.0.0
  * Requires at least:    6.5
  * Requires PHP:         8.3
  * Author:               RHINNO IT
@@ -22,7 +22,7 @@ namespace RhinnoIT\Customizer;
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RCUS_VERSION', '1.0.0' );
+define( 'RCUS_VERSION', '2.0.0' );
 define( 'RCUS_FILE', __FILE__ );
 define( 'RCUS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RCUS_URL', plugin_dir_url( __FILE__ ) );

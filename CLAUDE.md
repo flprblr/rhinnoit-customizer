@@ -361,7 +361,7 @@ a rollback; `Settings::retired_option_ids()` feeds the uninstall list, which a
 test checks, and `Settings_Page::save()` refuses a form that still names a
 retired switch. A switch removed outright, with nothing to inherit it, goes into
 `Settings::REMOVED` for the same three reasons. Both are empty: the plugin
-started at 1.0.0 with WP Optimizer's switches already split, and nothing has
+started at 2.0.0 with WP Optimizer's switches already split, and nothing has
 been retired since.
 
 Each `checkbox` says what it does in a few plain words (owner's request,

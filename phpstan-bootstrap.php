@@ -9,7 +9,7 @@
  * @package RhinnoIT\Customizer
  */
 
-define( 'RCUS_VERSION', '1.0.0' );
+define( 'RCUS_VERSION', '2.0.0' );
 define( 'RCUS_FILE', __FILE__ );
 define( 'RCUS_PATH', __DIR__ . '/' );
 define( 'RCUS_URL', 'https://example.test/wp-content/plugins/rhinnoit-customizer/' );

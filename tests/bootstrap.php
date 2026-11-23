@@ -27,7 +27,7 @@ register_shutdown_function(
 define( 'ABSPATH', $sandbox . '/' );
 define( 'RCUS_PATH', $sandbox . '/' );
 define( 'RCUS_URL', 'https://shop.test/wp-content/plugins/rhinnoit-customizer/' );
-define( 'RCUS_VERSION', '1.0.0' );
+define( 'RCUS_VERSION', '2.0.0' );
 define( 'RCUS_FILE', $sandbox . '/rhinnoit-customizer.php' );
 define( 'RCUS_BASENAME', 'rhinnoit-customizer/rhinnoit-customizer.php' );
 define( 'RCUS_MENU_PARENT_SLUG', 'rhinnoit-tools' );
