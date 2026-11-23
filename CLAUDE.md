@@ -605,10 +605,13 @@ The four features of 1.1.0 live by these rules:
   `Settings_Page` calls, and `Settings::chosen()` checks the stored ids by the
   field's `'id_format'` instead. A storefront request never lists the zones;
   the message row asks WooCommerce for the one zone its package matches, as
-  WooCommerce itself does to rate it, and only the submit asks it for one
-  instance's method (`WC_Shipping_Zones::get_shipping_method()`), for a
-  posted id gone from a package of the communes that names a chosen
-  instance. `ShippingSettingsTest` and `ShippingBlockTest` count the listings
+  WooCommerce itself does to rate it, and only the submit reads one
+  instance's method id, from its zone row
+  (`WC_Shipping_Zone_Data_Store::get_method()`), for a posted id
+  gone from a package of the communes that names a chosen instance. Never
+  `WC_Shipping_Zones::get_shipping_method()`: it builds the method's class,
+  a fatal at the submit when a shipping plugin registered a class it never
+  defines, and its test stub throws. `ShippingSettingsTest` and `ShippingBlockTest` count the listings
   (`WP_Stub::$zone_listings`), and `ShippingBlockTest` the instance reads
   (`WP_Stub::$method_lookups`). A `'group_labels'` callback, too, runs only
   when the screen draws.

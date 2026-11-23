@@ -199,7 +199,19 @@ final class Shipping_Exclusion {
 		}
 
 		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
-			if ( Shipping_Communes::has_rates( $package ) && ! self::is_pickup_id( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
+			if ( ! Shipping_Communes::matches( $package, $this->communes ) ) {
+				continue;
+			}
+
+			// WooCommerce refuses a package with nothing left on its own: the
+			// review is only drawn again, so it shows the message instead.
+			if ( ! Shipping_Communes::has_rates( $package ) ) {
+				Shipping_Communes::redraw_review();
+
+				continue;
+			}
+
+			if ( ! self::is_pickup_id( $id ) ) {
 				Shipping_Communes::refuse( $errors, 'rcus-shipping-exclusion', $this->message() );
 				Shipping_Communes::redraw_review();
 

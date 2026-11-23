@@ -527,26 +527,53 @@ class WC_Shipping_Zones {
 	}
 
 	/**
-	 * One method instance by its id, enabled or not, as WooCommerce 11.2 reads it from its zone's row; false for an id no zone has.
+	 * WooCommerce builds the instance's method class here, with no check that the class exists.
 	 *
-	 * Counts its calls in WP_Stub::$method_lookups: each is a read of the
-	 * database, which only the submit may make.
+	 * A shipping plugin that registered a class it never defines turns that
+	 * into a fatal, so the plugin must never call it on a checkout path: it
+	 * reads the zone's row through WC_Shipping_Zone_Data_Store instead. Calling it fails
+	 * the test that does.
 	 *
 	 * @param int $instance_id Instance id.
-	 * @return WC_Shipping_Method|false
+	 * @return never
 	 */
 	public static function get_shipping_method( $instance_id ) {
+		throw new Error( 'WC_Shipping_Zones::get_shipping_method() builds the method class, a fatal for a class never defined: read the zone row (WC_Shipping_Zone_Data_Store) instead.' );
+	}
+}
+
+/**
+ * WooCommerce's shipping zone data store, for the one read the plugin makes: a method instance's row.
+ */
+class WC_Shipping_Zone_Data_Store {
+
+	/**
+	 * One method instance's row, as WC_Shipping_Zone_Data_Store::get_method() reads it: null for an id no zone has.
+	 *
+	 * Counts its calls in WP_Stub::$method_lookups: each is a read of the
+	 * database, which only the submit may make. Builds no class, so a
+	 * method whose class nobody defined reads like any other.
+	 *
+	 * @param int $instance_id Instance id.
+	 * @return object|null
+	 */
+	public function get_method( $instance_id ) {
 		++WP_Stub::$method_lookups;
 
-		foreach ( WP_Stub::$zones as $zone ) {
+		foreach ( WP_Stub::$zones as $zone_id => $zone ) {
 			foreach ( $zone['methods'] ?? array() as $method ) {
 				if ( 0 !== $method->get_instance_id() && (int) $instance_id === $method->get_instance_id() ) {
-					return $method;
+					return (object) array(
+						'zone_id'     => (string) $zone_id,
+						'method_id'   => $method->id,
+						'instance_id' => (string) $method->get_instance_id(),
+						'is_enabled'  => 'yes' === $method->enabled ? '1' : '0',
+					);
 				}
 			}
 		}
 
-		return false;
+		return null;
 	}
 }
 

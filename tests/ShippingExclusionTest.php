@@ -443,7 +443,7 @@ final class ShippingExclusionTest extends TestCase {
 		$service->refuse_delivery( self::posted( 'flat_rate:5' ), $errors );
 
 		$this->assertSame( array(), $errors->get_error_messages(), 'WooCommerce refuses it on its own, once.' );
-		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ), 'The review is drawn again: WooCommerce\'s refusal alone leaves the gone method on it, and the message off.' );
 
 		WP_Stub::$wc->shipping()->packages = array(
 			0 => self::package( 'Penco' ),

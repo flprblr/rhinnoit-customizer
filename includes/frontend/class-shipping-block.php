@@ -169,8 +169,20 @@ final class Shipping_Block {
 		}
 
 		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
-			// takes() last: it may ask WooCommerce for an instance.
-			if ( Shipping_Communes::has_rates( $package ) && Shipping_Communes::matches( $package, $this->communes ) && $this->takes( $id ) ) {
+			if ( ! Shipping_Communes::matches( $package, $this->communes ) ) {
+				continue;
+			}
+
+			// WooCommerce refuses a package with nothing left on its own: the
+			// review is only drawn again, so it stops offering what is gone.
+			if ( ! Shipping_Communes::has_rates( $package ) ) {
+				Shipping_Communes::redraw_review();
+
+				continue;
+			}
+
+			// takes() last: it may read the instance's zone row.
+			if ( $this->takes( $id ) ) {
 				Shipping_Communes::refuse( $errors, 'rcus-shipping-block', $this->message() );
 				Shipping_Communes::redraw_review();
 
@@ -267,13 +279,32 @@ final class Shipping_Block {
 		$segments = explode( ':', $id );
 		$instance = $segments[1] ?? '';
 
-		if ( ! in_array( $instance, $this->methods, true ) || ! class_exists( \WC_Shipping_Zones::class ) ) {
+		if ( ! in_array( $instance, $this->methods, true ) ) {
 			return false;
 		}
 
-		$method = \WC_Shipping_Zones::get_shipping_method( absint( $instance ) );
+		return self::method_id_of( absint( $instance ) ) === $segments[0];
+	}
 
-		return $method instanceof \WC_Shipping_Method && $segments[0] === $method->id;
+	/**
+	 * The method id an instance was added with, read from its zone's row: '' without one.
+	 *
+	 * Read from WooCommerce's shipping zone data store, not through
+	 * WC_Shipping_Zones::get_shipping_method(), which builds the method's
+	 * class and is a fatal when a shipping plugin registered a class it never
+	 * defines. One query, made only at the submit.
+	 *
+	 * @param int $instance Instance id.
+	 * @return string
+	 */
+	private static function method_id_of( int $instance ): string {
+		if ( ! class_exists( \WC_Shipping_Zone_Data_Store::class ) ) {
+			return '';
+		}
+
+		$row = ( new \WC_Shipping_Zone_Data_Store() )->get_method( $instance );
+
+		return is_object( $row ) && isset( $row->method_id ) && is_string( $row->method_id ) ? $row->method_id : '';
 	}
 
 	/**

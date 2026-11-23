@@ -557,7 +557,7 @@ final class ShippingBlockTest extends TestCase {
 		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
 
 		$this->assertSame( array(), $errors->get_error_messages(), 'WooCommerce refuses it on its own, once.' );
-		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ), 'The review is drawn again: WooCommerce\'s refusal alone leaves the gone method on it.' );
 
 		WP_Stub::$wc->shipping()->packages = array(
 			0 => self::package( 'Paine' ),
