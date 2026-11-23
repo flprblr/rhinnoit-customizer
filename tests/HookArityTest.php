@@ -5,6 +5,9 @@
  * add_action() passes as many arguments as it was told to accept. A method
  * that requires more is an ArgumentCountError on every request that fires
  * the hook, and the stubs, which call nothing, cannot catch it any other way.
+ * A static method hooked by its class counts like an object's. The main
+ * file's activation and deactivation hooks are not registered here:
+ * PackagingTest reads them.
  *
  * Its own process with WeLaunch Multi Inventory active (RCUS_TESTS_WELAUNCH):
  * the WeLaunch services hook nothing without it, so in the shared process
@@ -90,17 +93,19 @@ final class HookArityTest extends TestCase {
 			$this->assertArrayHasKey( 'RhinnoIT\\Customizer\\Frontend\\' . $conditional, $classes, sprintf( '%s hooked nothing, so its callbacks went unchecked.', $conditional ) );
 		}
 
-		// The listed services hook forty-eight methods: Assets 1,
+		// The listed services hook fifty-four methods: Assets 1,
 		// Widget_Thumbnail 2, Widget_Sale_Price 1, Birthdate_Style 1,
 		// Express_Checkout 2, Checkout_Focus 1, Commune_Select 1,
-		// Rut_Validation 4, Cart_Sale_Price 3, Coupon_Split 1, Shipping_Block 4,
-		// Shipping_Exclusion 6, Inventory_Links 2, Quick_View_Store 1,
+		// Rut_Validation 4, Cart_Sale_Price 3, Coupon_Split 1, Shipping_Block 7,
+		// Shipping_Exclusion 9, Inventory_Links 2, Quick_View_Store 1,
 		// Size_Stores 2, Store_Choice 4, Pickup_Stores 1, Store_Stock_Hold 4,
 		// Unpaid_Orders 1, Fintoc_Session_Expiry 1, Menu 3, Settings_Page 1
-		// through Menu, and Plugin_Links 1. The save hook both shipping
-		// services add calls a static method, which takes nothing. Fewer
+		// through Menu, and Plugin_Links 1. Three of each shipping service's
+		// are the static Shipping_Communes::refresh_rates(), on the save and
+		// on core's activated_plugin and deactivated_plugin, which pass the
+		// plugin: checked like the rest, by the class the hook names. Fewer
 		// means the list above lost a service; raise it with every service
 		// added, lower it with one removed.
-		$this->assertGreaterThanOrEqual( 48, $checked, 'Most hooks went unchecked, so this case proves little.' );
+		$this->assertGreaterThanOrEqual( 54, $checked, 'Most hooks went unchecked, so this case proves little.' );
 	}
 }

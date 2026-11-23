@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Settings_Page;
 use RhinnoIT\Customizer\Frontend\Shipping_Block;
+use RhinnoIT\Customizer\Frontend\Shipping_Communes;
 use RhinnoIT\Customizer\Settings;
 
 /**
@@ -119,21 +120,27 @@ final class ShippingBlockTest extends TestCase {
 	}
 
 	/**
-	 * Without both lists, its switch or the master switch, nothing is hooked but the save of the screen.
+	 * Without both lists, its switch or the master switch, nothing is hooked but the save of the screen and the plugins' activation and deactivation.
 	 *
-	 * The save is heard whatever the switches say: the one that turns the rule
-	 * off has to free the rates it hid from every shopper's session.
+	 * Each is heard whatever the switches say: the save that turns the rule
+	 * off has to free the rates it hid from every shopper's session, and so
+	 * does the deactivation of a plugin that filtered rates - the old express
+	 * plugin among them - since WooCommerce bumps nothing for it.
 	 *
 	 * @param array<string, mixed> $options Rows that make it inert.
 	 * @return void
 	 */
 	#[DataProvider( 'inertSettings' )]
-	public function test_it_hooks_only_the_save_while_it_has_nothing_to_do( array $options ): void {
+	public function test_it_hooks_only_the_save_and_the_plugin_changes_while_it_has_nothing_to_do( array $options ): void {
 		WP_Stub::$options = array_merge( WP_Stub::$options, $options );
 
 		$this->service();
 
-		$this->assertSame( array( Settings_Page::SAVED_HOOK . ':refresh_rates' ), WP_Stub::$callbacks );
+		$this->assertSame( array( Settings_Page::SAVED_HOOK . ':refresh_rates', 'activated_plugin:refresh_rates', 'deactivated_plugin:refresh_rates' ), WP_Stub::$callbacks );
+
+		foreach ( array( Settings_Page::SAVED_HOOK, 'activated_plugin', 'deactivated_plugin' ) as $hook ) {
+			$this->assertContains( array( $hook, Shipping_Communes::class, 'refresh_rates', 1 ), WP_Stub::$registered, sprintf( '%s reaches the static bump, which WordPress keeps once for both rules.', $hook ) );
+		}
 	}
 
 	/**
@@ -183,6 +190,20 @@ final class ShippingBlockTest extends TestCase {
 		WP_Stub::$zones[0] = array( 'methods' => array( new WC_Shipping_Method( 6, 'flat_rate', 'Despacho Express' ) ) );
 
 		$this->assertStringContainsString( self::DEFAULT_MESSAGE, self::printed( $service ), 'The zone for everywhere else counts like any other.' );
+	}
+
+	/**
+	 * The message prints when the package that loses the method is not the first one of the cart.
+	 *
+	 * @return void
+	 */
+	public function test_the_message_prints_for_a_package_that_comes_second(): void {
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Providencia' ),
+			1 => self::package( 'Paine' ),
+		);
+
+		$this->assertSame( '<tr class="rcus-shipping-notice"><td colspan="2"><div class="woocommerce-info">' . self::DEFAULT_MESSAGE . '</div></td></tr>', self::printed( $this->service() ), 'A cart WooCommerce ships as two packages, the second to Paine.' );
 	}
 
 	/**
@@ -275,6 +296,145 @@ final class ShippingBlockTest extends TestCase {
 	}
 
 	/**
+	 * A hidden method still stored and chosen is refused when its package is not the first one of the cart.
+	 *
+	 * @return void
+	 */
+	public function test_a_hidden_method_chosen_for_a_package_that_comes_second_is_refused(): void {
+		$service = $this->service();
+		$errors  = new WP_Error();
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Providencia', 'CL-RM', self::only( 'flat_rate:5' ) ),
+			1 => self::package( 'Paine', 'CL-RM', self::only( 'flat_rate:5', 'flat_rate:6' ) ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'flat_rate:6' );
+
+		$service->refuse_hidden_method( array( 'shipping_method' => array( 'flat_rate:5', 'flat_rate:6' ) ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-block' ) );
+	}
+
+	/**
+	 * A hidden method the submit still posts is refused once the rates no longer hold it, and the review is drawn again.
+	 *
+	 * A checkout drawn before the rule covered Paine still offers express.
+	 * WooCommerce works the rates out again on the submit, finds express gone
+	 * and moves the package to the first rate left, which is what the session
+	 * holds by the time the submit is validated: on its own it would place
+	 * the order with standard delivery. Once with the rule's filter running in
+	 * the submit's own request, once with the rates an earlier request already
+	 * worked out - another tab, the cart page - so the filter never ran here.
+	 *
+	 * @return void
+	 */
+	public function test_a_hidden_method_posted_after_the_rates_lost_it_is_refused(): void {
+		// The submit's request: update_session() calculates the rates, the filter takes express.
+		$service = $this->service();
+		$rates   = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
+
+		$this->assertArrayNotHasKey( 'flat_rate:6', $rates );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine', 'CL-RM', $rates ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-block' ), 'WooCommerce chose standard delivery in its place, and would place the order on it.' );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ), 'The review is drawn again, without express.' );
+
+		// A later submit: the rates were worked out by an earlier request, and this one reuses them.
+		WP_Stub::$wc->session = new WC_Session_Handler();
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5' );
+
+		$service = $this->service();
+		$errors  = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-block' ), 'Read from the posted id, whose instance is a chosen one.' );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+
+		// The same, with the matching package second.
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Providencia', 'CL-RM', self::rates() ),
+			1 => self::package( 'Paine', 'CL-RM', $rates ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:5', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-block' ), 'Each posted id is read against its own package.' );
+	}
+
+	/**
+	 * A posted id that names no instance counts only when the filter took that very id in the same request.
+	 *
+	 * A courier's rate can carry a chosen instance and an id of its own shape;
+	 * the id alone then says nothing, so a submit whose rates an earlier
+	 * request worked out is left to WooCommerce.
+	 *
+	 * @return void
+	 */
+	public function test_a_posted_id_of_another_shape_counts_only_when_the_filter_took_it(): void {
+		$courier = new WC_Shipping_Rate( 'courier-sameday-6', 'Courier same day', 5990.0, array(), 'courier', 6 );
+		$service = $this->service();
+		$rates   = $service->hide_rates( self::rates() + array( 'courier-sameday-6' => $courier ), self::package( 'Paine' ) );
+
+		$this->assertSame( array( 'flat_rate:5', 'local_pickup:7', 'starken:express' ), array_keys( $rates ), 'Its instance is the chosen one.' );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine', 'CL-RM', $rates ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'courier-sameday-6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-block' ), 'Taken by the filter in this request.' );
+
+		$service = $this->service();
+		$errors  = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'courier-sameday-6' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'Worked out by an earlier request: nothing in the id says this rule took it.' );
+	}
+
+	/**
+	 * A posted rate this rule does not take, or a post that holds no rate id as text, goes through.
+	 *
+	 * @return void
+	 */
+	public function test_the_submit_refuses_no_other_posted_rate(): void {
+		$service = $this->service();
+		$rates   = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine', 'CL-RM', $rates ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5' );
+
+		$errors = new WP_Error();
+
+		foreach ( array( self::posted( 'flat_rate:5' ), self::posted( 'local_pickup:7' ), self::posted( 'flat_rate:9' ), self::posted( 'flat_rate:60' ), self::posted( 'starken:6x' ), self::posted( '' ) ) as $data ) {
+			$service->refuse_hidden_method( $data, $errors );
+		}
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'Standard delivery, pickup, a method gone for another reason, an instance or a suffix that only begins like a chosen instance, or nothing.' );
+
+		// What a crafted post or another plugin firing the action can hand over.
+		foreach ( array( array( 'shipping_method' => 'flat_rate:6' ), array( 'shipping_method' => array( array( 'flat_rate:6' ) ) ), array( 'shipping_method' => array( 1 => 'flat_rate:6' ) ), array(), null, 'flat_rate:6' ) as $data ) {
+			$service->refuse_hidden_method( $data, $errors );
+		}
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'No posted id as text, by its package\'s index: nothing to read.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Providencia', 'CL-RM', $rates ) );
+
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'Express is gone for another reason in a commune not chosen.' );
+		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ), 'Nothing refused, nothing to draw again.' );
+	}
+
+	/**
 	 * The screen lists every method of every zone as "Zone: method", the zone for everywhere else last.
 	 *
 	 * @return void
@@ -324,7 +484,10 @@ final class ShippingBlockTest extends TestCase {
 		$service = $this->service();
 		$service->hide_rates( self::rates(), self::package( 'Paine' ) );
 		self::printed( $service );
-		$service->refuse_hidden_method( array(), new WP_Error() );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', self::only( 'flat_rate:5' ) ) );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
 
 		$this->assertSame( 0, WP_Stub::$zone_listings );
 	}
@@ -370,6 +533,30 @@ final class ShippingBlockTest extends TestCase {
 			'flat_rate:6'     => new WC_Shipping_Rate( 'flat_rate:6', 'Despacho Express', 4990.0, array(), 'flat_rate', 6 ),
 			'local_pickup:7'  => new WC_Shipping_Rate( 'local_pickup:7', 'Retiro en tienda', 0.0, array(), 'local_pickup', 7 ),
 			'starken:express' => new WC_Shipping_Rate( 'starken:express', 'Starken Express', 5990.0, array(), 'starken', 0 ),
+		);
+	}
+
+	/**
+	 * Some of those rates, in the same order.
+	 *
+	 * @param string ...$ids Rate ids.
+	 * @return array<string, WC_Shipping_Rate>
+	 */
+	private static function only( string ...$ids ): array {
+		return array_intersect_key( self::rates(), array_flip( $ids ) );
+	}
+
+	/**
+	 * A classic checkout's submit as WC_Checkout::get_posted_data() hands it to woocommerce_after_checkout_validation: the rate ids by package index.
+	 *
+	 * @param string ...$ids The rate id posted for each package, in order.
+	 * @return array<string, mixed>
+	 */
+	private static function posted( string ...$ids ): array {
+		return array(
+			'billing_city'    => 'Paine',
+			'payment_method'  => 'bacs',
+			'shipping_method' => $ids,
 		);
 	}
 

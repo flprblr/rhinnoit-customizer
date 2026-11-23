@@ -163,6 +163,31 @@ final class PluginTest extends TestCase {
 		$this->assertSame( RCUS_VERSION, WP_Stub::$options[ Install::VERSION_OPTION ] );
 	}
 
+	/**
+	 * Activating and deactivating the plugin renew WooCommerce's shipping version, whatever the switches say.
+	 *
+	 * Deactivated, the plugin's shipping rules stop, and the rates they took
+	 * away would stay in every session that stored them; reactivated, the
+	 * lists saved before act at once. WooCommerce bumps nothing for either.
+	 *
+	 * @return void
+	 */
+	public function test_activation_and_deactivation_renew_the_shipping_version(): void {
+		WP_Stub::$transients['shipping-transient-version'] = '1700000000.000000';
+
+		Install::activate();
+
+		$this->assertNotSame( '1700000000.000000', WP_Stub::$transients['shipping-transient-version'], 'Reactivated with lists saved: they act on the stored rates at once.' );
+
+		WP_Stub::$transients['shipping-transient-version'] = '1700000000.000000';
+		WP_Stub::$options['rcus_enabled']                  = 'no';
+		WP_Stub::$options['rcus_shipping_exclusion']       = 'no';
+
+		Install::deactivate();
+
+		$this->assertNotSame( '1700000000.000000', WP_Stub::$transients['shipping-transient-version'], 'Deactivated: the rates the rules took away come back to every session.' );
+	}
+
 	public function test_a_stale_stored_version_reseeds_missing_options(): void {
 		WP_Stub::$options = array( Install::VERSION_OPTION => '0.9.0' );
 

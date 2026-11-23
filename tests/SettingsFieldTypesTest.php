@@ -161,6 +161,15 @@ final class SettingsFieldTypesTest extends TestCase {
 		$this->assertStringContainsString( '<option value="9&quot;&gt;&lt;b&gt;x&lt;/b&gt;">Standard &lt;b&gt;2 days&lt;/b&gt;</option>', $html, 'A callback\'s choices come from the database, id and label.' );
 		$this->assertStringContainsString( '>&lt;/textarea&gt;&lt;script&gt;alert(2)&lt;/script&gt;</textarea>', $html, 'The text shows as text, and cannot close its box.' );
 		$this->assertSame( 1, substr_count( $html, '</textarea>' ) );
+
+		// The box decodes the entities core's sanitizer writes; markup written as entities still prints as text.
+		WP_Stub::$options['rcus_message'] = '&lt;/textarea&gt;&lt;script&gt;alert(3)&lt;/script&gt;';
+
+		$html = self::draw( array( self::message() ) );
+
+		$this->assertDoesNotMatchRegularExpression( '/<script\b/i', $html );
+		$this->assertStringContainsString( '>&lt;/textarea&gt;&lt;script&gt;alert(3)&lt;/script&gt;</textarea>', $html );
+		$this->assertSame( 1, substr_count( $html, '</textarea>' ) );
 	}
 
 	/**
@@ -234,6 +243,35 @@ final class SettingsFieldTypesTest extends TestCase {
 		);
 		$this->assertSame( array( 'rcus_message' => '' ), Settings_Page::sanitize_submission( $fields, array( 'rcus_message' => array( 'No despachamos.' ) ) ), 'Not a text: not a form this plugin drew.' );
 		$this->assertSame( array( 'rcus_message' => '' ), Settings_Page::sanitize_submission( $fields, array() ) );
+	}
+
+	/**
+	 * A text with a lone '<', a '&' and an apostrophe shows in its box as typed, and saving the box untouched stores the same row.
+	 *
+	 * Core's sanitize_textarea_field() stores the lone '<' and the rest of
+	 * the text after it as entities, which the shop prints through esc_html()
+	 * as typed. Drawn through esc_textarea() alone, the box showed the
+	 * entities, and kept them on every save.
+	 *
+	 * @return void
+	 */
+	public function test_a_text_comes_back_to_its_box_as_typed(): void {
+		$fields = array( self::message() );
+		$typed  = "Pedidos < 2 kg: despacho express & retiro en O'Higgins.\nEscríbenos.";
+		$stored = Settings_Page::sanitize_submission( $fields, array( 'rcus_message' => $typed ) )['rcus_message'];
+
+		$this->assertSame( "Pedidos &lt; 2 kg: despacho express &amp; retiro en O&#039;Higgins.\nEscríbenos.", $stored, 'As core stores it: the lone < and what follows it as entities.' );
+
+		WP_Stub::$options['rcus_message'] = $stored;
+
+		$shown = self::box( self::draw( $fields ) );
+
+		$this->assertSame( $typed, $shown, 'The box shows what was typed, as the shop does.' );
+		$this->assertSame( $stored, Settings_Page::sanitize_submission( $fields, array( 'rcus_message' => $shown ) )['rcus_message'], 'Saved again untouched, the row stays the same.' );
+
+		// Core drops a % followed by two hexadecimal characters, so the README asks for the space.
+		$this->assertSame( 'Con 15 descuento.', Settings_Page::sanitize_submission( $fields, array( 'rcus_message' => 'Con 15%de descuento.' ) )['rcus_message'] );
+		$this->assertSame( 'Con 15 % de descuento.', Settings_Page::sanitize_submission( $fields, array( 'rcus_message' => 'Con 15 % de descuento.' ) )['rcus_message'] );
 	}
 
 	/**
@@ -333,6 +371,18 @@ final class SettingsFieldTypesTest extends TestCase {
 		( new Settings_Page() )->render_fields( self::card( $rows ) );
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * What a browser shows in the one textarea of this HTML, which is also what it posts when the form is saved untouched.
+	 *
+	 * @param string $html Drawn rows.
+	 * @return string
+	 */
+	private static function box( string $html ): string {
+		preg_match( '~<textarea[^>]*>(.*?)</textarea>~s', $html, $matches );
+
+		return html_entity_decode( $matches[1] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 	}
 
 	/**

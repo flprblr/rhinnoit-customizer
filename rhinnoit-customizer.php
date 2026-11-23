@@ -42,6 +42,7 @@ define( 'RCUS_MENU_TITLE', 'Customizer' );
 require_once RCUS_PATH . 'includes/autoload.php';
 
 register_activation_hook( RCUS_FILE, array( Install::class, 'activate' ) );
+register_deactivation_hook( RCUS_FILE, array( Install::class, 'deactivate' ) );
 
 // Feature flags must be declared before WooCommerce boots.
 add_action( 'before_woocommerce_init', array( Plugin::class, 'declare_woocommerce_compatibility' ) );

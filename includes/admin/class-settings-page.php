@@ -267,11 +267,17 @@ final class Settings_Page {
 	}
 
 	/**
-	 * Prints a textarea holding what Settings::text() would read from the row.
+	 * Prints a textarea holding what Settings::text() would read from the row, as the shop shows it.
 	 *
-	 * The one stored value this screen prints, so it goes through
-	 * esc_textarea(): markup written into the row shows as text in the box,
-	 * and cannot close it.
+	 * Core's sanitize_textarea_field() stores a lone '<', and the rest of the
+	 * text after it, as entities (wp_pre_kses_less_than()). The shop prints
+	 * the row through esc_html(), which leaves an entity as it is, so the
+	 * shopper reads what was typed; esc_textarea() encodes it once more, so
+	 * the box would show the entities, and keep them on every save. The row
+	 * is decoded first: the box shows what the shop shows, and saving it
+	 * again stores the same row. It is the one stored value this screen
+	 * prints, so it still goes through esc_textarea(): markup written into
+	 * the row shows as text in the box, and cannot close it.
 	 *
 	 * @param array<string, mixed> $field One field definition.
 	 * @param string               $id    Option id.
@@ -281,7 +287,7 @@ final class Settings_Page {
 		printf(
 			'<textarea rows="3" class="large-text" id="%1$s" name="%1$s" aria-describedby="%1$s-desc">%2$s</textarea>',
 			esc_attr( $id ),
-			esc_textarea( Settings::text_from( $field, get_option( $id, null ) ) )
+			esc_textarea( wp_specialchars_decode( Settings::text_from( $field, get_option( $id, null ) ), ENT_QUOTES ) )
 		);
 	}
 

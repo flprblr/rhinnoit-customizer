@@ -26,7 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * package instead, and no row is printed, so it never shows twice. An empty
  * message prints nothing and leaves WooCommerce's text; the methods still go.
  * The rates WooCommerce stored before the rule changed can still hold a
- * delivery the shopper chose, so the classic checkout's submit refuses it.
+ * delivery the shopper chose, and a checkout drawn before can still post one
+ * that is gone from the rates, so the classic checkout's submit refuses both.
  *
  * Inert until its list holds something.
  */
@@ -54,7 +55,7 @@ final class Shipping_Exclusion {
 	private ?string $message = null;
 
 	/**
-	 * Hooks the save of the screen, and the rule while it is on and its list holds something.
+	 * Hooks the save of the screen and any plugin's activation and deactivation, and the rule while it is on and its list holds something.
 	 *
 	 * @return void
 	 */
@@ -62,9 +63,11 @@ final class Shipping_Exclusion {
 		/*
 		 * Whatever the switches say: see Shipping_Communes::refresh_rates().
 		 * Shipping_Block hooks the same static callback, which WordPress keeps
-		 * once, so a save bumps the version once.
+		 * once per hook, so each bumps the version once.
 		 */
 		add_action( Shipping_Communes::SAVED, array( Shipping_Communes::class, 'refresh_rates' ) );
+		add_action( 'activated_plugin', array( Shipping_Communes::class, 'refresh_rates' ) );
+		add_action( 'deactivated_plugin', array( Shipping_Communes::class, 'refresh_rates' ) );
 
 		if ( ! Settings::feature( 'shipping_exclusion' ) ) {
 			return;
@@ -169,6 +172,12 @@ final class Shipping_Exclusion {
 	/**
 	 * Refuses an order that chose a delivery for a package shipping to one of the communes.
 	 *
+	 * Either the delivery is still in the rates WooCommerce stored, and
+	 * chosen, or the submit posted it and it is gone from the rates, where
+	 * WooCommerce would have moved the package to the first rate left - a
+	 * store the shopper never picked. The second time the review is drawn
+	 * again, so the shopper sees what is left. A posted pickup goes through.
+	 *
 	 * @param mixed $data   Posted checkout data.
 	 * @param mixed $errors The checkout's WP_Error.
 	 * @return void
@@ -185,6 +194,15 @@ final class Shipping_Exclusion {
 				return;
 			}
 		}
+
+		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
+			if ( ! self::is_pickup_id( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
+				Shipping_Communes::refuse( $errors, 'rcus-shipping-exclusion', $this->message() );
+				Shipping_Communes::redraw_review();
+
+				return;
+			}
+		}
 	}
 
 	/**
@@ -195,6 +213,19 @@ final class Shipping_Exclusion {
 	 */
 	private static function is_pickup( mixed $rate ): bool {
 		return $rate instanceof \WC_Shipping_Rate && in_array( $rate->get_method_id(), self::PICKUP, true );
+	}
+
+	/**
+	 * Whether a posted rate id is one of WooCommerce's pickup ones: its method id comes before the first colon.
+	 *
+	 * Read from the id itself, because a rate gone from the package leaves
+	 * nothing else to ask; this rule takes every other rate, whatever its id.
+	 *
+	 * @param string $id A posted rate id.
+	 * @return bool
+	 */
+	private static function is_pickup_id( string $id ): bool {
+		return in_array( explode( ':', $id )[0], self::PICKUP, true );
 	}
 
 	/**

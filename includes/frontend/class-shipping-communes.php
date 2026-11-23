@@ -23,7 +23,9 @@ defined( 'ABSPATH' ) || exit;
  * hash that includes its 'shipping' transient version, and recalculates them
  * only when the package changes. A list changed on the screen would wait
  * until then, so both services hook refresh_rates() to every save of the
- * screen, as WooCommerce bumps that version when its own zones are saved.
+ * screen, as WooCommerce bumps that version when its own zones are saved, and
+ * to every plugin's activation and deactivation, which WooCommerce does not
+ * bump it for; Install calls it when this plugin is activated or deactivated.
  *
  * Not a service: nothing here is registered by Plugin.
  */
@@ -98,9 +100,12 @@ final class Shipping_Communes {
 	/**
 	 * Each package with the rate the shopper chose for it, where its rates still hold that rate.
 	 *
-	 * A rate a rule took away is gone from its package, and WooCommerce
-	 * refuses that order itself. What is left to check is a chosen rate still
-	 * in the rates WooCommerce stored before the rule changed.
+	 * What this reads is a chosen rate still in the rates WooCommerce stored
+	 * before the rule changed. A rate a rule took away is gone from its
+	 * package instead, and the session no longer names it: WooCommerce moves
+	 * that package to its default rate - the first one left, on the classic
+	 * checkout - and would place the order on it. What the shopper chose is
+	 * then only in the submit, which posted_rates_gone() reads.
 	 *
 	 * @return array<int, array{0: array<mixed>, 1: \WC_Shipping_Rate}>
 	 */
@@ -126,6 +131,60 @@ final class Shipping_Communes {
 		}
 
 		return $pairs;
+	}
+
+	/**
+	 * Each package with the rate id the submit posted for it, where its rates no longer hold that id.
+	 *
+	 * A checkout drawn before a rule covered its commune - or submitted
+	 * before its review caught up with the address - still posts the rate it
+	 * offered. WooCommerce works the rates out again before it validates, and
+	 * when the posted one is gone it moves the package to its default rate
+	 * and places the order on that, without a word. The posted ids come by
+	 * package index, as WC_Checkout::get_posted_data() reads them; whether a
+	 * rule took one is for the rule to say, from the id alone, since the
+	 * rates may have been worked out again by an earlier request.
+	 *
+	 * @param mixed $data Posted checkout data.
+	 * @return array<int, array{0: array<mixed>, 1: string}>
+	 */
+	public static function posted_rates_gone( mixed $data ): array {
+		$posted = is_array( $data ) ? ( $data['shipping_method'] ?? null ) : null;
+
+		if ( ! is_array( $posted ) ) {
+			return array();
+		}
+
+		$pairs = array();
+
+		foreach ( self::packages() as $index => $package ) {
+			$id    = $posted[ $index ] ?? null;
+			$rates = $package['rates'] ?? null;
+
+			if ( is_string( $id ) && '' !== $id && ! ( is_array( $rates ) && isset( $rates[ $id ] ) ) ) {
+				$pairs[] = array( $package, $id );
+			}
+		}
+
+		return $pairs;
+	}
+
+	/**
+	 * Asks the classic checkout to draw its order review again once the refused submit comes back.
+	 *
+	 * WooCommerce answers a refused submit with 'refresh' while the session
+	 * holds refresh_totals, and its checkout script then updates the review,
+	 * whose shipping options no longer offer the rate that was posted.
+	 *
+	 * @return void
+	 */
+	public static function redraw_review(): void {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$session     = $woocommerce instanceof \WooCommerce ? $woocommerce->session : null;
+
+		if ( is_object( $session ) && method_exists( $session, 'set' ) ) {
+			$session->set( 'refresh_totals', true );
+		}
 	}
 
 	/**
@@ -175,9 +234,15 @@ final class Shipping_Communes {
 	 *
 	 * Hooked to every save of the screen whatever the switches say: the save
 	 * that turns a rule off has to free the rates it hid, and the one that
-	 * turns it on runs with the old values. WooCommerce stores the version as
-	 * a transient and adds it to each package's hash, so this costs one write,
-	 * and each shopper's next cart or checkout recalculates.
+	 * turns it on runs with the old values. Hooked as well to core's
+	 * activated_plugin and deactivated_plugin, since a plugin that filters
+	 * rates - the old shipping plugins this one replaces among them - leaves
+	 * what it did in every session once it is off, and called by
+	 * Install::activate() and Install::deactivate(), since deactivating this
+	 * plugin turns both rules off too. Each hook passes arguments this takes
+	 * no notice of. WooCommerce stores the version as a transient and adds it
+	 * to each package's hash, so this costs one write, and each shopper's next
+	 * cart or checkout recalculates.
 	 *
 	 * @return void
 	 */

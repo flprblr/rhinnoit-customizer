@@ -21,8 +21,10 @@ lists.
 older plugins of the owner's, which it replaces: `Rut_Validation`,
 `Birthdate_Style`, and the two shipping rules, `Shipping_Block` and
 `Shipping_Exclusion`, with the helper they share, `Shipping_Communes`. Only
-the ideas were taken, never the code. See Communes, shipping rules and
-checkout fields below, and *Replacing the old plugins* in the README.
+the ideas were taken, never the PHP or JavaScript; the birth date field's CSS
+rules, and the RUT field's error and disabled colours, are the old plugins'.
+See Communes, shipping rules and checkout fields below, and *Replacing the old
+plugins* in the README.
 
 Everything in this repository is written in English: code, comments, docblocks,
 UI strings and documentation.
@@ -231,7 +233,8 @@ UI strings and documentation.
 - `tests/HookArityTest.php` registers every service and fails when a hooked
   method needs more arguments than its hook passes - an `ArgumentCountError` on
   every request that fires it. A new service goes into its list. It runs with
-  WeLaunch active, so the WeLaunch services hook too.
+  WeLaunch active, so the WeLaunch services hook too. A static method hooked
+  by its class is checked like an object's, since the stubs record its class.
 - A filter that WordPress core feeds is tested with the value core really
   passes, read from core's source - not with the value it resolves to later. A
   case fed the resolved value passes while the feature does nothing on the
@@ -448,9 +451,13 @@ switch could only be overruled or disagree with it.
   that live in the database, an `'options_callback'` the form calls only when
   it draws or saves the screen, never on a storefront request. A `textarea`
   is one text, sanitized with `sanitize_textarea_field()` and printed with
-  `esc_textarea()`. A switch sits beside its text; a list or a text box goes
-  below it and fills the row (`.rcus-row--wide`). Adding a type means adding
-  it to `Settings_Page::render_field()` and
+  `esc_textarea( wp_specialchars_decode( ... ) )`: core's sanitizer stores a
+  lone `<` and the rest of the text after it as entities, which the shop's
+  `esc_html()` shows as typed, so the box decodes them to show what the shop
+  shows, and a re-save stores the same row (`SettingsFieldTypesTest`). A
+  switch sits beside its text; a list or a text box goes below it and fills
+  the row (`.rcus-row--wide`). Adding a type means adding it to
+  `Settings_Page::render_field()` and
   `Settings_Page::sanitize_submission()` in the same change: a type one knows
   and the other does not is either unsaveable or unsafe. The save reads
   only the ids the field list declares, each through its own type's sanitizer,
@@ -558,10 +565,33 @@ The four features of 1.1.0 live by these rules:
   shopper's session, keyed by its `shipping` transient version, so every save
   of the screen bumps that version: `Shipping_Communes::refresh_rates()` on
   `Shipping_Communes::SAVED` (see Interface), hooked by both services before
-  they read their switch. Keep it unconditional - the save that turns a rule
-  off has to free the rates it hid - and make anything else that ever writes
-  these options (a migration, an import) bump it too, with
+  they read their switch. Keep it unconditional - what turns a rule off has to
+  free the rates it hid, a save as much as a deactivation. So the same static
+  callback is hooked to core's `activated_plugin` and `deactivated_plugin`,
+  for which WooCommerce bumps nothing (the old shipping plugins' deactivation
+  among them), and `Install::activate()` and `Install::deactivate()` call it,
+  the second registered with `register_deactivation_hook()` in the main file
+  (`PackagingTest` reads both), since this plugin's own deactivation turns its
+  rules off, and the request that activates it registers no service to hear
+  `activated_plugin`. Make anything else that ever writes these options (a
+  migration, an import) bump it too, with
   `WC_Cache_Helper::get_transient_version( 'shipping', true )`.
+- The submit check (`woocommerce_after_checkout_validation`) reads two things.
+  A chosen rate still in the rates WooCommerce stored before the rule changed
+  is in the session (`Shipping_Communes::chosen_rates()`). A rate the submit
+  posted that is gone from the rates WooCommerce worked out again is only in
+  the posted data: WooCommerce moves that package to its default rate - the
+  first one left on the classic checkout - and places the order without a
+  word, so `Shipping_Communes::posted_rates_gone()` reads
+  `$data['shipping_method']` by package index, and a refusal of that kind also
+  sets `refresh_totals` (`Shipping_Communes::redraw_review()`), which has the
+  checkout's script redraw the review. Whether a rule took a posted id is read
+  from the id itself, never only from what ran in this request, since an
+  earlier request may have worked the rates out: Stop deliveries takes every
+  id whose method id, before the first colon, is not in `PICKUP`; Hide
+  shipping methods one whose second segment is a chosen instance id (a zone
+  rate is `method_id:instance_id[:suffix]`), or one `hide_rates()` took in this
+  request, for ids of another shape.
 - Choices that live in the database - today every zone's shipping methods,
   `Shipping_Block::method_choices()` - are built only when the screen draws or
   saves: they come from a field's `'options_callback'`, which only

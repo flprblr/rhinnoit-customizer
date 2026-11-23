@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Settings_Page;
+use RhinnoIT\Customizer\Frontend\Shipping_Communes;
 use RhinnoIT\Customizer\Frontend\Shipping_Exclusion;
 
 /**
@@ -107,18 +108,22 @@ final class ShippingExclusionTest extends TestCase {
 	}
 
 	/**
-	 * Without its list, its switch or the master switch, nothing is hooked but the save of the screen.
+	 * Without its list, its switch or the master switch, nothing is hooked but the save of the screen and the plugins' activation and deactivation.
 	 *
 	 * @param array<string, mixed> $options Rows that make it inert.
 	 * @return void
 	 */
 	#[DataProvider( 'inertSettings' )]
-	public function test_it_hooks_only_the_save_while_it_has_nothing_to_do( array $options ): void {
+	public function test_it_hooks_only_the_save_and_the_plugin_changes_while_it_has_nothing_to_do( array $options ): void {
 		WP_Stub::$options = array_merge( WP_Stub::$options, $options );
 
 		$this->service();
 
-		$this->assertSame( array( Settings_Page::SAVED_HOOK . ':refresh_rates' ), WP_Stub::$callbacks, 'The save that turns the rule off still has to free the rates it hid.' );
+		$this->assertSame( array( Settings_Page::SAVED_HOOK . ':refresh_rates', 'activated_plugin:refresh_rates', 'deactivated_plugin:refresh_rates' ), WP_Stub::$callbacks, 'The save that turns the rule off still has to free the rates it hid, and so does the deactivation of the old exclusion plugin, which took pickup too.' );
+
+		foreach ( array( Settings_Page::SAVED_HOOK, 'activated_plugin', 'deactivated_plugin' ) as $hook ) {
+			$this->assertContains( array( $hook, Shipping_Communes::class, 'refresh_rates', 1 ), WP_Stub::$registered, sprintf( '%s reaches the static bump, which WordPress keeps once for both rules.', $hook ) );
+		}
 	}
 
 	/**
@@ -159,6 +164,20 @@ final class ShippingExclusionTest extends TestCase {
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Penco', self::pickup() ), self::package( 'Penco' ) );
 
 		$this->assertSame( '', self::printed( $service ), 'One package left with nothing says it there, so no row repeats it.' );
+	}
+
+	/**
+	 * The message takes WooCommerce's place in a package left with nothing that is not the first one of the cart.
+	 *
+	 * @return void
+	 */
+	public function test_the_message_replaces_woocommerces_text_for_a_package_that_comes_second(): void {
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Concepción', self::rates() ),
+			1 => self::package( 'Penco' ),
+		);
+
+		$this->assertSame( self::DEFAULT_MESSAGE, $this->service()->replace_no_shipping_text( self::CHECKOUT_TEXT ), 'A cart WooCommerce ships as two packages, the second to Penco.' );
 	}
 
 	/**
@@ -269,6 +288,110 @@ final class ShippingExclusionTest extends TestCase {
 	}
 
 	/**
+	 * A delivery still stored and chosen is refused when its package is not the first one of the cart.
+	 *
+	 * @return void
+	 */
+	public function test_a_delivery_chosen_for_a_package_that_comes_second_is_refused(): void {
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Concepción', self::rates() ),
+			1 => self::package( 'Penco', self::rates() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-exclusion' ) );
+	}
+
+	/**
+	 * A delivery the submit still posts is refused once the rates no longer hold it, and the review is drawn again.
+	 *
+	 * A checkout drawn before the rule covered Penco still offers home
+	 * delivery. WooCommerce works the rates out again on the submit, finds it
+	 * gone and moves the package to the first rate left - a store the shopper
+	 * never picked - which is what the session holds by the time the submit is
+	 * validated: on its own it would place the order as a pickup at $0. Once
+	 * with the rule's filter running in the submit's own request, once with
+	 * the rates an earlier request already worked out.
+	 *
+	 * @return void
+	 */
+	public function test_a_delivery_posted_after_the_rates_lost_it_is_refused(): void {
+		// The submit's request: update_session() calculates the rates, the filter keeps pickup only.
+		$service = $this->service();
+		$rates   = $service->keep_pickup_only( self::rates(), self::package( 'Penco' ) );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Penco', $rates ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup:7' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-exclusion' ), 'WooCommerce chose the store in its place, and would place the order on it.' );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ), 'The review is drawn again, pickup only.' );
+
+		// A later submit: the rates were worked out by an earlier request, and this one reuses them.
+		WP_Stub::$wc->session = new WC_Session_Handler();
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup:7' );
+
+		$service = $this->service();
+		$errors  = new WP_Error();
+		$service->refuse_delivery( self::posted( 'starken:express' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-exclusion' ), 'Read from the posted id: a courier\'s rate is a delivery too.' );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+
+		// The same, with Penco second.
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Concepción', self::rates() ),
+			1 => self::package( 'Penco', self::pickup() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'local_pickup:7' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages( 'rcus-shipping-exclusion' ), 'Each posted id is read against its own package.' );
+	}
+
+	/**
+	 * A posted pickup goes through, still offered or not, and so does a post that holds no rate id as text.
+	 *
+	 * @return void
+	 */
+	public function test_a_posted_pickup_goes_through(): void {
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Penco', self::pickup() ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup:7' );
+
+		$errors = new WP_Error();
+
+		foreach ( array( 'local_pickup:7', 'pickup_location:0', 'local_pickup:8', 'pickup_location:3', '' ) as $id ) {
+			$service->refuse_delivery( self::posted( $id ), $errors );
+		}
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'Store pickup stays, and one gone from the rates leaves WooCommerce another store: all that is left.' );
+
+		foreach ( array( array( 'shipping_method' => 'flat_rate:5' ), array( 'shipping_method' => array( array( 'flat_rate:5' ) ) ), array( 'shipping_method' => array( 1 => 'flat_rate:5' ) ), array(), null ) as $data ) {
+			$service->refuse_delivery( $data, $errors );
+		}
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'No posted id as text, by its package\'s index: nothing to read.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Concepción', self::pickup() ) );
+
+		$service->refuse_delivery( self::posted( 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'A delivery gone for another reason in a commune not chosen.' );
+		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ), 'Nothing refused, nothing to draw again.' );
+	}
+
+	/**
 	 * A registered service, as Plugin::__construct() leaves it.
 	 *
 	 * @return Shipping_Exclusion
@@ -320,6 +443,20 @@ final class ShippingExclusionTest extends TestCase {
 	 */
 	private static function pickup(): array {
 		return array_intersect_key( self::rates(), array_flip( array( 'local_pickup:7', 'pickup_location:0' ) ) );
+	}
+
+	/**
+	 * A classic checkout's submit as WC_Checkout::get_posted_data() hands it to woocommerce_after_checkout_validation: the rate ids by package index.
+	 *
+	 * @param string ...$ids The rate id posted for each package, in order.
+	 * @return array<string, mixed>
+	 */
+	private static function posted( string ...$ids ): array {
+		return array(
+			'billing_city'    => 'Penco',
+			'payment_method'  => 'bacs',
+			'shipping_method' => $ids,
+		);
 	}
 
 	/**

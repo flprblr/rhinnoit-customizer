@@ -1,11 +1,12 @@
 <?php
 /**
- * Guards the identity WordPress and the zip read out of the plugin header.
+ * Guards what WordPress and the zip read out of the main plugin file: the header's identity, and the hooks registered there.
  *
  * @package RhinnoIT\Customizer
  */
 
 use PHPUnit\Framework\TestCase;
+use RhinnoIT\Customizer\Install;
 
 final class PackagingTest extends TestCase {
 
@@ -76,6 +77,33 @@ final class PackagingTest extends TestCase {
 			$entry[1],
 			'The entry hangs from a node that already says RHINNO IT.'
 		);
+	}
+
+	/**
+	 * The main file hands the plugin's activation and deactivation to Install, whose methods run on what WordPress passes.
+	 *
+	 * No case loads the main file - the bootstrap defines its constants - so
+	 * its source is read, as the header is. Without the deactivation hook,
+	 * deactivating the plugin would leave the rates its shipping rules took
+	 * away in every shopper's session.
+	 *
+	 * @return void
+	 */
+	public function test_activation_and_deactivation_reach_install(): void {
+		$source = $this->main_file();
+
+		foreach ( array( 'activation' => 'activate', 'deactivation' => 'deactivate' ) as $hook => $method ) {
+			$this->assertStringContainsString(
+				sprintf( "register_%s_hook( RCUS_FILE, array( Install::class, '%s' ) );", $hook, $method ),
+				$source,
+				sprintf( 'The main file no longer hands the %s to Install::%s().', $hook, $method )
+			);
+
+			$reflection = new ReflectionMethod( Install::class, $method );
+
+			$this->assertTrue( $reflection->isPublic() && $reflection->isStatic(), sprintf( 'WordPress calls Install::%s() by its class.', $method ) );
+			$this->assertSame( 0, $reflection->getNumberOfRequiredParameters(), sprintf( 'WordPress passes Install::%s() only whether it runs network wide.', $method ) );
+		}
 	}
 
 	public function test_the_package_manifest_declares_no_version_to_drift(): void {

@@ -188,7 +188,7 @@ final class WP_Stub {
 	 */
 	public static array $fired = array();
 	/**
-	 * Every add_action()/add_filter(): hook, class of the object, method, accepted args.
+	 * Every add_action()/add_filter(): hook, class of the object or of the static method (null for a function), method, accepted args.
 	 *
 	 * @var array<int, array{0: string, 1: string|null, 2: string, 3: int}>
 	 */
@@ -383,11 +383,13 @@ function get_transient( $key ) { return WP_Stub::$transients[ $key ] ?? false; }
 function set_transient( $key, $value, $ttl = 0 ) { WP_Stub::$transients[ $key ] = $value; return true; }
 
 function rcus_stub_callback_name( $cb ) { return is_array( $cb ) ? (string) $cb[1] : ( is_string( $cb ) ? $cb : 'closure' ); }
+// The class of a method callback, an object's or a static one's; null for a function or a closure.
+function rcus_stub_callback_class( $cb ) { return is_array( $cb ) ? ( is_object( $cb[0] ) ? get_class( $cb[0] ) : ( is_string( $cb[0] ) ? $cb[0] : null ) ) : null; }
 function rcus_stub_register( $hook, $cb, $priority, $args ) {
 	WP_Stub::$hooks[]      = $hook;
 	WP_Stub::$callbacks[]  = $hook . ':' . rcus_stub_callback_name( $cb );
 	WP_Stub::$priorities[ $hook . ':' . rcus_stub_callback_name( $cb ) ] = (int) $priority;
-	WP_Stub::$registered[] = array( (string) $hook, is_array( $cb ) && is_object( $cb[0] ) ? get_class( $cb[0] ) : null, rcus_stub_callback_name( $cb ), (int) $args );
+	WP_Stub::$registered[] = array( (string) $hook, rcus_stub_callback_class( $cb ), rcus_stub_callback_name( $cb ), (int) $args );
 }
 function add_action( $hook, $cb, $priority = 10, $args = 1 ) { rcus_stub_register( $hook, $cb, $priority, $args ); }
 function add_filter( $hook, $cb, $priority = 10, $args = 1 ) { if ( is_string( $cb ) ) { WP_Stub::$present_filters[ $hook . ':' . $cb ] = (int) $priority; } rcus_stub_register( $hook, $cb, $priority, $args ); }
@@ -453,8 +455,87 @@ function home_url( $path = '' ) { return rtrim( WP_Stub::$home_url, '/' ) . '/' 
 function rest_get_url_prefix() { return 'wp-json'; }
 // As core: both strip the tags, and only the textarea one keeps the line breaks.
 function sanitize_text_field( $str ) { return trim( (string) preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $str ) ) ); }
-function sanitize_textarea_field( $str ) { return trim( strip_tags( (string) $str ) ); }
+/**
+ * Core's sanitize_textarea_field() (formatting.php, _sanitize_text_fields() keeping the line breaks), step for step.
+ *
+ * A lone '<' is no tag: wp_pre_kses_less_than() turns it, and the text after
+ * it up to the next '<' or '>', into entities, as esc_html() does without
+ * encoding an entity twice, before the tags go. Then every '%' followed by
+ * two hexadecimal characters goes, as core drops percent-encoded octets.
+ *
+ * @param mixed $str Text.
+ * @return string
+ */
+function sanitize_textarea_field( $str ) {
+	if ( is_object( $str ) || is_array( $str ) ) {
+		return '';
+	}
+
+	$filtered = (string) $str;
+
+	if ( str_contains( $filtered, '<' ) ) {
+		$filtered = (string) preg_replace_callback(
+			'%<[^>]*?((?=<)|>|$)%',
+			static fn ( array $matches ): string => str_contains( $matches[0], '>' ) ? $matches[0] : htmlspecialchars( $matches[0], ENT_QUOTES, 'UTF-8', false ),
+			$filtered
+		);
+		$filtered = str_replace( "<\n", "&lt;\n", wp_strip_all_tags( $filtered ) );
+	}
+
+	$filtered = trim( $filtered );
+	$found    = false;
+
+	while ( preg_match( '/%[a-f0-9]{2}/i', $filtered, $match ) ) {
+		$filtered = str_replace( $match[0], '', $filtered );
+		$found    = true;
+	}
+
+	return $found ? trim( (string) preg_replace( '/ +/', ' ', $filtered ) ) : $filtered;
+}
 function esc_textarea( $text ) { return htmlspecialchars( (string) $text, ENT_QUOTES ); }
+/**
+ * Core's wp_specialchars_decode() (formatting.php): only the entities esc_html() and esc_textarea() write, zero-padded or not.
+ *
+ * @param mixed      $text        Text.
+ * @param string|int $quote_style ENT_NOQUOTES, ENT_COMPAT or ENT_QUOTES, or core's older 'single' and 'double'.
+ * @return string
+ */
+function wp_specialchars_decode( $text, $quote_style = ENT_NOQUOTES ) {
+	$text = (string) $text;
+
+	if ( ! str_contains( $text, '&' ) ) {
+		return $text;
+	}
+
+	if ( empty( $quote_style ) ) {
+		$quote_style = ENT_NOQUOTES;
+	} elseif ( ! in_array( $quote_style, array( 0, 2, 3, 'single', 'double' ), true ) ) {
+		$quote_style = ENT_QUOTES;
+	}
+
+	$single      = array( '&#039;' => '\'', '&#x27;' => '\'' );
+	$single_preg = array( '/&#0*39;/' => '&#039;', '/&#x0*27;/i' => '&#x27;' );
+	$double      = array( '&quot;' => '"', '&#034;' => '"', '&#x22;' => '"' );
+	$double_preg = array( '/&#0*34;/' => '&#034;', '/&#x0*22;/i' => '&#x22;' );
+	$others      = array( '&lt;' => '<', '&#060;' => '<', '&gt;' => '>', '&#062;' => '>', '&amp;' => '&', '&#038;' => '&', '&#x26;' => '&' );
+	$others_preg = array( '/&#0*60;/' => '&#060;', '/&#0*62;/' => '&#062;', '/&#0*38;/' => '&#038;', '/&#x0*26;/i' => '&#x26;' );
+
+	if ( ENT_QUOTES === $quote_style ) {
+		$translation      = array_merge( $single, $double, $others );
+		$translation_preg = array_merge( $single_preg, $double_preg, $others_preg );
+	} elseif ( ENT_COMPAT === $quote_style || 'double' === $quote_style ) {
+		$translation      = array_merge( $double, $others );
+		$translation_preg = array_merge( $double_preg, $others_preg );
+	} elseif ( 'single' === $quote_style ) {
+		$translation      = array_merge( $single, $others );
+		$translation_preg = array_merge( $single_preg, $others_preg );
+	} else {
+		$translation      = $others;
+		$translation_preg = $others_preg;
+	}
+
+	return strtr( (string) preg_replace( array_keys( $translation_preg ), array_values( $translation_preg ), $text ), $translation );
+}
 function esc_url_raw( $url ) { return str_replace( array( '"', '<', '>', ' ' ), '', (string) $url ); }
 
 /** The parent theme's directory: Porto's, unless the process runs with RCUS_TESTS_PORTO=none. */

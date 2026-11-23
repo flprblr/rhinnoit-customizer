@@ -25,7 +25,8 @@ defined( 'ABSPATH' ) || exit;
  * the classic cart and checkout show the message as a row under the shipping
  * options; an empty message shows nothing, and the methods still go. The
  * rates WooCommerce stored before the rule changed can still hold a hidden
- * method the shopper chose, so the classic checkout's submit refuses it.
+ * method the shopper chose, and a checkout drawn before can still post one
+ * that is gone from the rates, so the classic checkout's submit refuses both.
  *
  * Inert until both lists hold something.
  */
@@ -53,7 +54,14 @@ final class Shipping_Block {
 	private ?string $message = null;
 
 	/**
-	 * Hooks the save of the screen, and the rule while it is on and both lists hold something.
+	 * Rate ids hide_rates() took away in this request, for the submit: see takes().
+	 *
+	 * @var array<string, bool>
+	 */
+	private array $taken = array();
+
+	/**
+	 * Hooks the save of the screen and any plugin's activation and deactivation, and the rule while it is on and both lists hold something.
 	 *
 	 * @return void
 	 */
@@ -61,9 +69,11 @@ final class Shipping_Block {
 		/*
 		 * Whatever the switches say: see Shipping_Communes::refresh_rates().
 		 * Shipping_Exclusion hooks the same static callback, which WordPress
-		 * keeps once, so a save bumps the version once.
+		 * keeps once per hook, so each bumps the version once.
 		 */
 		add_action( Shipping_Communes::SAVED, array( Shipping_Communes::class, 'refresh_rates' ) );
+		add_action( 'activated_plugin', array( Shipping_Communes::class, 'refresh_rates' ) );
+		add_action( 'deactivated_plugin', array( Shipping_Communes::class, 'refresh_rates' ) );
 
 		if ( ! Settings::feature( 'shipping_block' ) ) {
 			return;
@@ -97,6 +107,8 @@ final class Shipping_Block {
 
 		foreach ( $rates as $key => $rate ) {
 			if ( $rate instanceof \WC_Shipping_Rate && $this->hides( $rate ) ) {
+				$this->taken[ (string) $key ] = true;
+
 				unset( $rates[ $key ] );
 			}
 		}
@@ -131,6 +143,11 @@ final class Shipping_Block {
 	/**
 	 * Refuses an order whose chosen method this rule hides for its commune.
 	 *
+	 * Either the hidden method is still in the rates WooCommerce stored, and
+	 * chosen, or the submit posted it and it is gone from the rates, where
+	 * WooCommerce would have moved the package to another method. The second
+	 * time the review is drawn again, so the shopper sees what is left.
+	 *
 	 * @param mixed $data   Posted checkout data.
 	 * @param mixed $errors The checkout's WP_Error.
 	 * @return void
@@ -143,6 +160,15 @@ final class Shipping_Block {
 		foreach ( Shipping_Communes::chosen_rates() as list( $package, $rate ) ) {
 			if ( $this->hides( $rate ) && Shipping_Communes::matches( $package, $this->communes ) ) {
 				Shipping_Communes::refuse( $errors, 'rcus-shipping-block', $this->message() );
+
+				return;
+			}
+		}
+
+		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
+			if ( $this->takes( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
+				Shipping_Communes::refuse( $errors, 'rcus-shipping-block', $this->message() );
+				Shipping_Communes::redraw_review();
 
 				return;
 			}
@@ -210,6 +236,24 @@ final class Shipping_Block {
 		$id = $rate->get_instance_id();
 
 		return ( is_int( $id ) || is_string( $id ) ) && in_array( (string) $id, $this->methods, true );
+	}
+
+	/**
+	 * Whether this rule takes a rate the submit posted by its id: one of a chosen instance's.
+	 *
+	 * Read from the id itself, because the rates may have been worked out
+	 * again by an earlier request, where this request's filter never saw
+	 * them. A zone method's rate id is its method id, its instance id and
+	 * maybe a suffix of its own, joined by colons
+	 * (WC_Shipping_Method::get_rate_id()). An id of another shape tells no
+	 * instance, so it counts only when hide_rates() took that very id in
+	 * this request.
+	 *
+	 * @param string $id A posted rate id.
+	 * @return bool
+	 */
+	private function takes( string $id ): bool {
+		return in_array( explode( ':', $id )[1] ?? '', $this->methods, true ) || isset( $this->taken[ $id ] );
 	}
 
 	/**

@@ -309,7 +309,7 @@ class WC_Cart {
 }
 
 /**
- * WooCommerce's session: only the values Store_Stock_Hold reads from it.
+ * WooCommerce's session: the values the services read from it, and the ones they set.
  */
 class WC_Session_Handler {
 
@@ -318,6 +318,10 @@ class WC_Session_Handler {
 
 	public function get( string $key, mixed $default_value = null ): mixed {
 		return $this->data[ $key ] ?? $default_value;
+	}
+
+	public function set( string $key, mixed $value ): void {
+		$this->data[ $key ] = $value;
 	}
 }
 

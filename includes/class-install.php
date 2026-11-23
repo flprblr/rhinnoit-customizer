@@ -7,6 +7,8 @@
 
 namespace RhinnoIT\Customizer;
 
+use RhinnoIT\Customizer\Frontend\Shipping_Communes;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -56,10 +58,32 @@ final class Install {
 	 * made before WP Optimizer is deleted, because its uninstaller deletes the
 	 * rows the copy reads.
 	 *
+	 * Then it bumps WooCommerce's shipping version, so the shipping rules a
+	 * reactivated plugin finds saved act on every shopper's stored rates at
+	 * once. The services that hook the same bump to core's activated_plugin
+	 * are not registered in the request that activates this plugin.
+	 *
 	 * @return void
 	 */
 	public static function activate(): void {
 		self::seed_defaults();
+
+		Shipping_Communes::refresh_rates();
+	}
+
+	/**
+	 * Runs on deactivation.
+	 *
+	 * Deactivating the plugin turns both shipping rules off, and the rates
+	 * they took away stay in every shopper's stored rates until WooCommerce's
+	 * shipping version changes, which a deactivation does not do by itself.
+	 * So it bumps that version, whatever the switches say: what turns a rule
+	 * off has to free the rates it hid. Nothing without WooCommerce.
+	 *
+	 * @return void
+	 */
+	public static function deactivate(): void {
+		Shipping_Communes::refresh_rates();
 	}
 
 	/**

@@ -19,10 +19,12 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use RhinnoIT\Customizer\Admin\Menu;
 use RhinnoIT\Customizer\Admin\Settings_Page;
+use RhinnoIT\Customizer\Install;
 use RhinnoIT\Customizer\Plugin;
 use RhinnoIT\Customizer\Settings;
 
 #[CoversClass( Plugin::class )]
+#[CoversClass( Install::class )]
 final class BootWithoutWooCommerceTest extends TestCase {
 
 	public static function setUpBeforeClass(): void {
@@ -51,6 +53,24 @@ final class BootWithoutWooCommerceTest extends TestCase {
 		$this->assertNotContains( 'woocommerce_cancel_unpaid_orders_interval_minutes', WP_Stub::$hooks, 'Switched on, and still WooCommerce half only.' );
 		$this->assertNotContains( 'woocommerce_cart_item_price', WP_Stub::$hooks, 'Switched on, and still WooCommerce half only.' );
 		$this->assertNotContains( 'admin_notices', WP_Stub::$hooks, 'No WooCommerce is a valid site, not an error to announce.' );
+	}
+
+	/**
+	 * Activating and deactivating the plugin bump no shipping version where WooCommerce is missing, and break nothing.
+	 *
+	 * @return void
+	 */
+	#[RunInSeparateProcess]
+	public function test_activation_and_deactivation_touch_no_shipping_without_woocommerce(): void {
+		$this->assertFalse( class_exists( 'WC_Cache_Helper' ), 'The child has to lack WooCommerce\'s cache helper or this case means nothing.' );
+
+		WP_Stub::reset();
+
+		Install::activate();
+		Install::deactivate();
+
+		$this->assertArrayNotHasKey( 'shipping-transient-version', WP_Stub::$transients, 'No WooCommerce, no stored rates to refresh.' );
+		$this->assertSame( RCUS_VERSION, WP_Stub::$options[ Install::VERSION_OPTION ], 'The activation still seeds the site.' );
 	}
 
 	#[RunInSeparateProcess]
