@@ -14,10 +14,10 @@ page cache ones. Each of those feature files is WP Optimizer's, byte for byte,
 with the identity renamed and two kinds of hand edit: the copies of the
 WooCommerce names the Optimizer also holds (see Layout), and the keys that keep
 WP Optimizer's spelling on purpose (see Prefixes). The exception is
-`Commune_Select`, which 1.1.0 gave `region_names()`, for the screen's commune
+`Commune_Select`, which gained `region_names()` here, for the screen's commune
 lists.
 
-1.1.0 added four features of this plugin's own, built on the ideas of four
+Four features are this plugin's own, built on the ideas of four
 older plugins of the owner's, which it replaces: `Rut_Validation`,
 `Birthdate_Style`, and the two shipping rules, `Shipping_Block` and
 `Shipping_Exclusion`, with the helper they share, `Shipping_Communes`. Only
@@ -533,7 +533,7 @@ reached from there has to fail soft:
 
 ## Communes, shipping rules and checkout fields
 
-The four features of 1.1.0 live by these rules:
+The four features of this plugin's own live by these rules:
 
 - Chile's communes exist once, in `Frontend\Commune_Select::COMMUNES`: the 346
   official names, keyed by WooCommerce's 16 region codes. The checkout's

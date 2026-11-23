@@ -11,8 +11,8 @@ draws its screen with the master switch alone and does nothing else.
 
 It was split out of **RHINNO IT - WP Optimizer** 2.8.13, together with
 **RHINNO IT - Optimizer**, which took the delivery and page cache half. See
-[Migrating from WP Optimizer](#migrating-from-wp-optimizer). Version 1.1.0
-also replaces four older plugins of the owner's with features of its own: the
+[Migrating from WP Optimizer](#migrating-from-wp-optimizer). It also
+replaces four older plugins of the owner's with features of its own: the
 RUT check, the birth date field and two shipping rules by commune. See
 [Replacing the old plugins](#replacing-the-old-plugins).
 
@@ -168,7 +168,7 @@ Optimizer starts from the choices it made there.
 The version numbers below (2.7.x, 2.8.x) are WP Optimizer's releases, where
 these features were written and measured. This plugin starts at 1.0.0 with the
 code of 2.8.13. The RUT check, the birth date field and the two shipping rules
-are its own, from 1.1.0, built on the ideas of older plugins (see *Replacing
+are its own, built on the ideas of older plugins (see *Replacing
 the old plugins*).
 
 **WooCommerce** - shown only when WooCommerce 8.0+ is active:
@@ -566,8 +566,8 @@ stops re-seeding new options. `tests/PackagingTest.php` fails when they drift.
 
 Bump both on every release of this plugin. It started at 1.0.0, the number the
 template gives a new plugin, with the features of WP Optimizer 2.8.13: a
-version that starts with 2 in this README is WP Optimizer's. 1.1.0 added the
-four features that replace older plugins of the owner's (see *Replacing the
+version that starts with 2 in this README is WP Optimizer's. 1.0.0 also holds
+the four features that replace older plugins of the owner's (see *Replacing the
 old plugins*).
 
 ## PHP version
@@ -889,7 +889,7 @@ later would break the same things.
 
 ## Replacing the old plugins
 
-Version 1.1.0 does what four older plugins of the owner's did, rebuilt under
+This plugin also does what four older plugins of the owner's did, rebuilt under
 this plugin's rules: each behind its own switch, and what they wrote in their
 code - a method's instance id, the communes, a message - picked and written on
 this screen instead.
@@ -903,7 +903,8 @@ this screen instead.
 
 On a shop that runs any of them, in one visit:
 
-1. **Update** the Customizer to 1.1.0. The RUT check and the birth date field
+1. **Install** the Customizer, as *Migrating from WP Optimizer* says when the
+   shop runs it. The RUT check and the birth date field
    act from the next request: both ship on, and a switch never saved reads as
    its default. The two shipping rules ship on too, and do nothing while their
    lists are empty.
