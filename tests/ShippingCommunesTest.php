@@ -93,6 +93,29 @@ final class ShippingCommunesTest extends TestCase {
 	}
 
 	/**
+	 * A package has rates while one is left to choose; anything else in their place is none.
+	 *
+	 * @return void
+	 */
+	public function test_a_package_has_rates_while_one_is_left(): void {
+		$standard = new WC_Shipping_Rate( 'flat_rate:5', 'Despacho estándar', 2990.0, array(), 'flat_rate', 5 );
+		$package  = self::package( 'Paine' );
+
+		$this->assertTrue( Shipping_Communes::has_rates( self::package( 'Paine', array( 'flat_rate:5' => $standard ) ) ) );
+		$this->assertFalse( Shipping_Communes::has_rates( $package ), 'Nothing left: WooCommerce refuses the order itself.' );
+
+		foreach ( array( null, 'flat_rate:5', 1 ) as $rates ) {
+			$package['rates'] = $rates;
+
+			$this->assertFalse( Shipping_Communes::has_rates( $package ), sprintf( 'Rates read for %s.', var_export( $rates, true ) ) );
+		}
+
+		unset( $package['rates'] );
+
+		$this->assertFalse( Shipping_Communes::has_rates( $package ), 'No rates at all.' );
+	}
+
+	/**
 	 * Each package comes with the rate the shopper chose, only while its rates hold it.
 	 *
 	 * @return void

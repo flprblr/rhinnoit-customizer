@@ -413,7 +413,7 @@ final class ShippingBlockTest extends TestCase {
 
 		$errors = new WP_Error();
 
-		foreach ( array( self::posted( 'flat_rate:5' ), self::posted( 'local_pickup:7' ), self::posted( 'flat_rate:9' ), self::posted( 'flat_rate:60' ), self::posted( 'starken:6x' ), self::posted( '' ) ) as $data ) {
+		foreach ( array( self::posted( 'flat_rate:5' ), self::posted( 'local_pickup:7' ), self::posted( 'flat_rate:9' ), self::posted( 'flat_rate:60' ), self::posted( 'flat_rate:6x' ), self::posted( 'starken:6x' ), self::posted( '' ) ) as $data ) {
 			$service->refuse_hidden_method( $data, $errors );
 		}
 
@@ -432,6 +432,190 @@ final class ShippingBlockTest extends TestCase {
 
 		$this->assertSame( array(), $errors->get_error_messages(), 'Express is gone for another reason in a commune not chosen.' );
 		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ), 'Nothing refused, nothing to draw again.' );
+	}
+
+	/**
+	 * A posted id is the rule's when it names a chosen instance and that instance's own method, with a suffix of its own or without.
+	 *
+	 * A zone method's rate is method_id:instance_id[:suffix]. A method
+	 * outside every zone builds the same shape with a number of its own in
+	 * the second place - a courier's service, the block checkout's
+	 * pickup_location:N with N a location - and names no instance, even when
+	 * that number is a chosen one. The rates were worked out by an earlier
+	 * request, so the id is all there is to read.
+	 *
+	 * @return void
+	 */
+	public function test_a_posted_id_is_the_rules_only_with_the_chosen_instances_own_method(): void {
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine', 'CL-RM', self::only( 'flat_rate:5', 'local_pickup:7' ) ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5' );
+
+		$cases = array(
+			'flat_rate:6'       => true,
+			'flat_rate:6:2'     => true,
+			'courier:6'         => false,
+			'pickup_location:6' => false,
+			'local_pickup:6'    => false,
+			':6'                => false,
+		);
+
+		foreach ( $cases as $id => $taken ) {
+			$errors = new WP_Error();
+			$this->service()->refuse_hidden_method( self::posted( $id ), $errors );
+
+			$this->assertSame( $taken ? array( self::DEFAULT_MESSAGE ) : array(), $errors->get_error_messages(), sprintf( '%s posted, instance 6 a flat rate.', $id ) );
+		}
+
+		// Instance 6 a table rate, whose rates carry a suffix of their own.
+		WP_Stub::$zones[1]['methods'][1] = new WC_Shipping_Method( 6, 'table_rate', 'Despacho Express' );
+
+		foreach ( array( 'table_rate:6:2' => true, 'table_rate:6' => true, 'flat_rate:6' => false ) as $id => $taken ) {
+			$errors = new WP_Error();
+			$this->service()->refuse_hidden_method( self::posted( $id ), $errors );
+
+			$this->assertSame( $taken ? array( self::DEFAULT_MESSAGE ) : array(), $errors->get_error_messages(), sprintf( '%s posted, instance 6 a table rate.', $id ) );
+		}
+
+		// Instance 6 deleted from its zone: no rate names it any more.
+		unset( WP_Stub::$zones[1]['methods'][1] );
+
+		$errors = new WP_Error();
+		$this->service()->refuse_hidden_method( self::posted( 'table_rate:6:2' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'An instance WooCommerce no longer has names no method.' );
+	}
+
+	/**
+	 * WooCommerce is asked for an instance's method only at the submit, for a posted id gone from a package of the communes that names a chosen instance.
+	 *
+	 * The answer is a read of the database. The cart, the checkout's review
+	 * and a stored rate never need it: each rate carries its instance.
+	 *
+	 * @return void
+	 */
+	public function test_an_instance_is_read_only_at_the_submit_for_an_id_the_rule_may_take(): void {
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine', 'CL-RM', self::rates() ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6' );
+
+		$service = $this->service();
+		$rates   = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
+		self::printed( $service );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
+
+		$this->assertSame( 0, WP_Stub::$method_lookups, 'The rates, the message and a stored rate chosen.' );
+
+		// The submit's own request, whose filter took express.
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', $rates ) );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages() );
+		$this->assertSame( 0, WP_Stub::$method_lookups, 'An id the filter took in this request needs no read.' );
+
+		// A later request, whose filter took nothing.
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', $rates ) );
+
+		foreach ( array( 'flat_rate:5', 'flat_rate:9', 'courier-sameday-6' ) as $id ) {
+			$service->refuse_hidden_method( self::posted( $id ), new WP_Error() );
+		}
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Providencia', 'CL-RM', $rates ) );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
+
+		$this->assertSame( 0, WP_Stub::$method_lookups, 'Still offered, an instance not chosen, an id naming none, a commune not chosen, a package WooCommerce refuses itself.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', $rates ) );
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
+
+		$this->assertSame( 1, WP_Stub::$method_lookups, 'One read, for the id the rule may take.' );
+	}
+
+	/**
+	 * A package left with no method at all is WooCommerce's to refuse: the rule adds no notice of its own, and reads on.
+	 *
+	 * Where the zone offers express alone, a checkout drawn before the rule
+	 * covered Paine still posts it. WooCommerce finds no rate chosen among
+	 * the package's, none being left, and refuses the order with "No shipping
+	 * method has been selected"; the rule's message would only ask for
+	 * another method where there is none.
+	 *
+	 * @return void
+	 */
+	public function test_a_package_with_no_method_left_is_left_to_woocommerce(): void {
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine' ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( '' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'WooCommerce refuses it on its own, once.' );
+		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Paine' ),
+			1 => self::package( 'Paine', 'CL-RM', self::only( 'flat_rate:5' ) ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( '', 'flat_rate:5' );
+
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'The next package, standard delivery left, is still the rule\'s.' );
+	}
+
+	/**
+	 * Every package is read until one is refused, and the order is refused once, however many lose the method.
+	 *
+	 * @return void
+	 */
+	public function test_each_package_is_read_and_the_order_refused_once(): void {
+		$service = $this->service();
+		$left    = self::only( 'flat_rate:5', 'local_pickup:7' );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Paine', 'CL-RM', $left ),
+			1 => self::package( 'Ñuñoa', 'CL-RM', $left ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:9', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'The second package\'s express, behind a method gone for another reason.' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Both packages posted express: one notice.' );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Paine', 'CL-RM', self::rates() ),
+			1 => self::package( 'Ñuñoa', 'CL-RM', self::rates() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6', 'flat_rate:6' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Both packages chose express from the stored rates: one notice.' );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Paine', 'CL-RM', self::rates() ),
+			1 => self::package( 'Ñuñoa', 'CL-RM', $left ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6', 'flat_rate:5' );
+
+		$errors = new WP_Error();
+		$service->refuse_hidden_method( self::posted( 'flat_rate:6', 'flat_rate:6' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'One chose it from the stored rates, the other posted it after they lost it: one notice.' );
 	}
 
 	/**

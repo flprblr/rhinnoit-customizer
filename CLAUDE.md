@@ -585,22 +585,33 @@ The four features of 1.1.0 live by these rules:
   word, so `Shipping_Communes::posted_rates_gone()` reads
   `$data['shipping_method']` by package index, and a refusal of that kind also
   sets `refresh_totals` (`Shipping_Communes::redraw_review()`), which has the
-  checkout's script redraw the review. Whether a rule took a posted id is read
-  from the id itself, never only from what ran in this request, since an
-  earlier request may have worked the rates out: Stop deliveries takes every
-  id whose method id, before the first colon, is not in `PICKUP`; Hide
-  shipping methods one whose second segment is a chosen instance id (a zone
-  rate is `method_id:instance_id[:suffix]`), or one `hide_rates()` took in this
-  request, for ids of another shape.
+  checkout's script redraw the review. A package with no rate left is skipped
+  (`Shipping_Communes::has_rates()`): WooCommerce refuses it itself, saying no
+  shipping method has been selected, and a rule's notice would only repeat
+  that, or ask for another method where there is none. Each rule refuses
+  once, at the first package it takes, so a cart of several packages gets one
+  notice per rule. Whether a rule took a posted id is read from the id
+  itself, never only from what ran in this request, since an earlier request
+  may have worked the rates out: Stop deliveries takes every id whose method
+  id, before the first colon, is not in `PICKUP`; Hide shipping methods one
+  whose second segment is a chosen instance id and whose first is that
+  instance's own method id (a zone rate is `method_id:instance_id[:suffix]`,
+  and a method outside every zone builds the same shape with a number of its
+  own, as `pickup_location:N` does with a location), or one `hide_rates()`
+  took in this request, for ids of another shape.
 - Choices that live in the database - today every zone's shipping methods,
   `Shipping_Block::method_choices()` - are built only when the screen draws or
   saves: they come from a field's `'options_callback'`, which only
   `Settings_Page` calls, and `Settings::chosen()` checks the stored ids by the
   field's `'id_format'` instead. A storefront request never lists the zones;
   the message row asks WooCommerce for the one zone its package matches, as
-  WooCommerce itself does to rate it. `ShippingSettingsTest` and
-  `ShippingBlockTest` count the listings (`WP_Stub::$zone_listings`). A
-  `'group_labels'` callback, too, runs only when the screen draws.
+  WooCommerce itself does to rate it, and only the submit asks it for one
+  instance's method (`WC_Shipping_Zones::get_shipping_method()`), for a
+  posted id gone from a package of the communes that names a chosen
+  instance. `ShippingSettingsTest` and `ShippingBlockTest` count the listings
+  (`WP_Stub::$zone_listings`), and `ShippingBlockTest` the instance reads
+  (`WP_Stub::$method_lookups`). A `'group_labels'` callback, too, runs only
+  when the screen draws.
 - `billing_rut`, its Chilean/foreigner radio `billing_is_chilean` and
   `billing_birthdate` belong to another plugin, which adds them to the checkout
   (owner's decision, 2026-11-21). This plugin never creates, removes or

@@ -146,7 +146,10 @@ final class Shipping_Block {
 	 * Either the hidden method is still in the rates WooCommerce stored, and
 	 * chosen, or the submit posted it and it is gone from the rates, where
 	 * WooCommerce would have moved the package to another method. The second
-	 * time the review is drawn again, so the shopper sees what is left.
+	 * time the review is drawn again, so the shopper sees what is left. A
+	 * package with no method left is WooCommerce's to refuse, and it does: a
+	 * second notice would only ask for another method where there is none.
+	 * The order is refused once, however many packages lose the method.
 	 *
 	 * @param mixed $data   Posted checkout data.
 	 * @param mixed $errors The checkout's WP_Error.
@@ -166,7 +169,8 @@ final class Shipping_Block {
 		}
 
 		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
-			if ( $this->takes( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
+			// takes() last: it may ask WooCommerce for an instance.
+			if ( Shipping_Communes::has_rates( $package ) && Shipping_Communes::matches( $package, $this->communes ) && $this->takes( $id ) ) {
 				Shipping_Communes::refuse( $errors, 'rcus-shipping-block', $this->message() );
 				Shipping_Communes::redraw_review();
 
@@ -245,15 +249,31 @@ final class Shipping_Block {
 	 * again by an earlier request, where this request's filter never saw
 	 * them. A zone method's rate id is its method id, its instance id and
 	 * maybe a suffix of its own, joined by colons
-	 * (WC_Shipping_Method::get_rate_id()). An id of another shape tells no
-	 * instance, so it counts only when hide_rates() took that very id in
-	 * this request.
+	 * (WC_Shipping_Method::get_rate_id()). A method outside every zone joins
+	 * its id and a number of its own the same way - the block checkout's
+	 * pickup_location:N, N a location - so a chosen instance in second place
+	 * counts only behind that instance's own method id, which WooCommerce is
+	 * asked here, at the submit, and never on a page load. Any other id
+	 * counts only when hide_rates() took that very id in this request.
 	 *
 	 * @param string $id A posted rate id.
 	 * @return bool
 	 */
 	private function takes( string $id ): bool {
-		return in_array( explode( ':', $id )[1] ?? '', $this->methods, true ) || isset( $this->taken[ $id ] );
+		if ( isset( $this->taken[ $id ] ) ) {
+			return true;
+		}
+
+		$segments = explode( ':', $id );
+		$instance = $segments[1] ?? '';
+
+		if ( ! in_array( $instance, $this->methods, true ) || ! class_exists( \WC_Shipping_Zones::class ) ) {
+			return false;
+		}
+
+		$method = \WC_Shipping_Zones::get_shipping_method( absint( $instance ) );
+
+		return $method instanceof \WC_Shipping_Method && $segments[0] === $method->id;
 	}
 
 	/**

@@ -392,6 +392,118 @@ final class ShippingExclusionTest extends TestCase {
 	}
 
 	/**
+	 * A pickup another plugin registers under a method id of its own goes like any delivery: in the rates, chosen and posted.
+	 *
+	 * Only the ids in Shipping_Exclusion::PICKUP stay, matched whole, so one
+	 * that merely begins like WooCommerce's local pickup is not one of them.
+	 *
+	 * @return void
+	 */
+	public function test_a_pickup_of_another_plugin_goes_like_any_delivery(): void {
+		$plus    = array( 'local_pickup_plus:3' => new WC_Shipping_Rate( 'local_pickup_plus:3', 'Retiro en sucursal', 0.0, array(), 'local_pickup_plus', 0 ) );
+		$service = $this->service();
+
+		$this->assertSame( array( 'local_pickup:7', 'pickup_location:0' ), array_keys( $service->keep_pickup_only( self::rates() + $plus, self::package( 'Penco' ) ) ), 'Its rate goes.' );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Penco', self::rates() + $plus ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup_plus:3' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'local_pickup_plus:3' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Still in the rates WooCommerce stored, and chosen.' );
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Penco', self::pickup() ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup:7' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'local_pickup_plus:3' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Posted after the rates lost it.' );
+		$this->assertTrue( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+	}
+
+	/**
+	 * A package left with nothing is WooCommerce's to refuse: the rule adds no notice of its own, and reads on.
+	 *
+	 * Where the zone has no pickup, a checkout drawn before the rule covered
+	 * Penco still posts home delivery. WooCommerce finds no rate chosen among
+	 * the package's, none being left, and refuses the order with "No shipping
+	 * method has been selected"; the rule's message would only say it twice.
+	 *
+	 * @return void
+	 */
+	public function test_a_package_with_nothing_left_is_left_to_woocommerce(): void {
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Penco' ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( '' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array(), $errors->get_error_messages(), 'WooCommerce refuses it on its own, once.' );
+		$this->assertNull( WP_Stub::$wc->session->get( 'refresh_totals' ) );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Penco' ),
+			1 => self::package( 'Tomé', self::pickup() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( '', 'local_pickup:7' );
+
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'The next package, pickup left, is still the rule\'s.' );
+	}
+
+	/**
+	 * Every package is read until one is refused, and the order is refused once, however many ship to the communes.
+	 *
+	 * @return void
+	 */
+	public function test_each_package_is_read_and_the_order_refused_once(): void {
+		$service = $this->service();
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Penco', self::pickup() ),
+			1 => self::package( 'Tomé', self::pickup() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'local_pickup:7', 'local_pickup:7' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'local_pickup:8', 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'The second package\'s delivery, behind a store gone for another reason.' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'starken:express' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Both packages posted a delivery: one notice.' );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Penco', self::rates() ),
+			1 => self::package( 'Tomé', self::rates() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'starken:express' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'starken:express' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'Both packages chose a delivery from the stored rates: one notice.' );
+
+		WP_Stub::$wc->shipping()->packages = array(
+			0 => self::package( 'Penco', self::rates() ),
+			1 => self::package( 'Tomé', self::pickup() ),
+		);
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'local_pickup:7' );
+
+		$errors = new WP_Error();
+		$service->refuse_delivery( self::posted( 'flat_rate:5', 'flat_rate:5' ), $errors );
+
+		$this->assertSame( array( self::DEFAULT_MESSAGE ), $errors->get_error_messages(), 'One chose it from the stored rates, the other posted it after they lost it: one notice.' );
+	}
+
+	/**
 	 * A registered service, as Plugin::__construct() leaves it.
 	 *
 	 * @return Shipping_Exclusion

@@ -98,6 +98,20 @@ final class Shipping_Communes {
 	}
 
 	/**
+	 * Whether a package has any rate left to choose.
+	 *
+	 * A package with none is WooCommerce's own to refuse at the submit: no
+	 * rate chosen for it is among its rates, so WooCommerce says that no
+	 * shipping method has been selected, whatever was posted.
+	 *
+	 * @param array<mixed> $package A shipping package.
+	 * @return bool
+	 */
+	public static function has_rates( array $package ): bool {
+		return is_array( $package['rates'] ?? null ) && array() !== $package['rates'];
+	}
+
+	/**
 	 * Each package with the rate the shopper chose for it, where its rates still hold that rate.
 	 *
 	 * What this reads is a chosen rate still in the rates WooCommerce stored
@@ -140,10 +154,11 @@ final class Shipping_Communes {
 	 * before its review caught up with the address - still posts the rate it
 	 * offered. WooCommerce works the rates out again before it validates, and
 	 * when the posted one is gone it moves the package to its default rate
-	 * and places the order on that, without a word. The posted ids come by
-	 * package index, as WC_Checkout::get_posted_data() reads them; whether a
-	 * rule took one is for the rule to say, from the id alone, since the
-	 * rates may have been worked out again by an earlier request.
+	 * and places the order on that, without a word, or refuses the order
+	 * itself when the package has no rate left (has_rates()). The posted ids
+	 * come by package index, as WC_Checkout::get_posted_data() reads them;
+	 * whether a rule took one is for the rule to say, from the id alone,
+	 * since the rates may have been worked out again by an earlier request.
 	 *
 	 * @param mixed $data Posted checkout data.
 	 * @return array<int, array{0: array<mixed>, 1: string}>

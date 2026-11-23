@@ -90,6 +90,8 @@ final class WP_Stub {
 	public static array $zones = array();
 	/** Times WC_Shipping_Zones::get_zones() read every zone. */
 	public static int $zone_listings = 0;
+	/** Times WC_Shipping_Zones::get_shipping_method() read one instance. */
+	public static int $method_lookups = 0;
 	/** @var array<string, int> Named callbacks registered on a filter, hook:callback => priority, for has_filter(). */
 	public static array $present_filters = array();
 	/** @var array<int, object> Orders by id, for wc_get_order(). */
@@ -251,6 +253,7 @@ final class WP_Stub {
 		self::$translations    = array();
 		self::$zones           = array();
 		self::$zone_listings   = 0;
+		self::$method_lookups  = 0;
 		self::$orders          = array();
 		self::$reserved        = array();
 		self::$terms           = array();

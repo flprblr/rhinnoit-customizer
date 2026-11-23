@@ -131,7 +131,7 @@ final class Shipping_Exclusion {
 				continue;
 			}
 
-			if ( ! self::has_rates( $package ) ) {
+			if ( ! Shipping_Communes::has_rates( $package ) ) {
 				return;
 			}
 
@@ -161,7 +161,7 @@ final class Shipping_Exclusion {
 		}
 
 		foreach ( Shipping_Communes::packages() as $package ) {
-			if ( Shipping_Communes::matches( $package, $this->communes ) && ! self::has_rates( $package ) ) {
+			if ( Shipping_Communes::matches( $package, $this->communes ) && ! Shipping_Communes::has_rates( $package ) ) {
 				return Shipping_Communes::html( $message );
 			}
 		}
@@ -176,7 +176,10 @@ final class Shipping_Exclusion {
 	 * chosen, or the submit posted it and it is gone from the rates, where
 	 * WooCommerce would have moved the package to the first rate left - a
 	 * store the shopper never picked. The second time the review is drawn
-	 * again, so the shopper sees what is left. A posted pickup goes through.
+	 * again, so the shopper sees what is left. A posted pickup goes through,
+	 * and so does a package with nothing left, which WooCommerce refuses
+	 * itself: a second notice would only repeat its own. The order is
+	 * refused once, however many packages ship to the communes.
 	 *
 	 * @param mixed $data   Posted checkout data.
 	 * @param mixed $errors The checkout's WP_Error.
@@ -196,7 +199,7 @@ final class Shipping_Exclusion {
 		}
 
 		foreach ( Shipping_Communes::posted_rates_gone( $data ) as list( $package, $id ) ) {
-			if ( ! self::is_pickup_id( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
+			if ( Shipping_Communes::has_rates( $package ) && ! self::is_pickup_id( $id ) && Shipping_Communes::matches( $package, $this->communes ) ) {
 				Shipping_Communes::refuse( $errors, 'rcus-shipping-exclusion', $this->message() );
 				Shipping_Communes::redraw_review();
 
@@ -226,16 +229,6 @@ final class Shipping_Exclusion {
 	 */
 	private static function is_pickup_id( string $id ): bool {
 		return in_array( explode( ':', $id )[0], self::PICKUP, true );
-	}
-
-	/**
-	 * Whether a package has any rate left to choose.
-	 *
-	 * @param array<mixed> $package A shipping package.
-	 * @return bool
-	 */
-	private static function has_rates( array $package ): bool {
-		return is_array( $package['rates'] ?? null ) && array() !== $package['rates'];
 	}
 
 	/**

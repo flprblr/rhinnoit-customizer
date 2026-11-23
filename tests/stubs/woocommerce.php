@@ -525,6 +525,29 @@ class WC_Shipping_Zones {
 
 		return new WC_Shipping_Zone( 0 );
 	}
+
+	/**
+	 * One method instance by its id, enabled or not, as WooCommerce 11.2 reads it from its zone's row; false for an id no zone has.
+	 *
+	 * Counts its calls in WP_Stub::$method_lookups: each is a read of the
+	 * database, which only the submit may make.
+	 *
+	 * @param int $instance_id Instance id.
+	 * @return WC_Shipping_Method|false
+	 */
+	public static function get_shipping_method( $instance_id ) {
+		++WP_Stub::$method_lookups;
+
+		foreach ( WP_Stub::$zones as $zone ) {
+			foreach ( $zone['methods'] ?? array() as $method ) {
+				if ( 0 !== $method->get_instance_id() && (int) $instance_id === $method->get_instance_id() ) {
+					return $method;
+				}
+			}
+		}
+
+		return false;
+	}
 }
 
 /**
