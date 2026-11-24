@@ -138,7 +138,7 @@ msgid "Hide shipping methods in some communes"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "For an address in the communes below, the shipping methods below are not offered, and the cart and the classic checkout show the message. Check both."
+msgid "For an address in the communes below, the shipping methods below are not offered, and a shopper who had one of them selected sees the message in the cart and the classic checkout. Check both."
 msgstr ""
 
 #: includes/class-settings.php
@@ -170,11 +170,11 @@ msgid "Message for those communes"
 msgstr ""
 
 #: includes/class-settings.php
-msgid "Shown with the shipping options; leave it empty to show nothing."
+msgid "Shown with the shipping options to a shopper who had one of the methods selected; leave it empty to show nothing."
 msgstr ""
 
 #: includes/class-settings.php
-msgid "Express delivery is not available for your commune. Please choose another shipping method."
+msgid "Express delivery is not available for your commune."
 msgstr ""
 
 #: includes/class-settings.php
@@ -191,6 +191,10 @@ msgstr ""
 
 #: includes/class-settings.php
 msgid "Communes without delivery"
+msgstr ""
+
+#: includes/class-settings.php
+msgid "Shown with the shipping options; leave it empty to show nothing."
 msgstr ""
 
 #: includes/class-settings.php

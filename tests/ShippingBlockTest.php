@@ -22,7 +22,12 @@ final class ShippingBlockTest extends TestCase {
 	/**
 	 * The message a row never saved prints.
 	 */
-	private const string DEFAULT_MESSAGE = 'Express delivery is not available for your commune. Please choose another shipping method.';
+	private const string DEFAULT_MESSAGE = 'Express delivery is not available for your commune.';
+
+	/**
+	 * The row that message prints as.
+	 */
+	private const string NOTICE = '<tr class="rcus-shipping-notice"><td colspan="2"><div class="woocommerce-info">' . self::DEFAULT_MESSAGE . '</div></td></tr>';
 
 	/**
 	 * Express hidden in two outlying communes of Santiago, as YNK's shop hid it; Santiago's zone offers it.
@@ -155,14 +160,15 @@ final class ShippingBlockTest extends TestCase {
 		);
 
 		$service = $this->service();
+		self::take_express( $service );
 
 		$this->assertContains( 'woocommerce_cart_totals_after_shipping:print_notice', WP_Stub::$callbacks );
 		$this->assertContains( 'woocommerce_review_order_after_shipping:print_notice', WP_Stub::$callbacks );
-		$this->assertSame( '<tr class="rcus-shipping-notice"><td colspan="2"><div class="woocommerce-info">' . self::DEFAULT_MESSAGE . '</div></td></tr>', self::printed( $service ), 'Two packages, one message.' );
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'Two packages, one message.' );
 	}
 
 	/**
-	 * No row for a commune not chosen, or a zone that does not offer the method.
+	 * No row for a commune not chosen, or a zone that does not offer the method, even after the rule took the shopper's choice.
 	 *
 	 * @return void
 	 */
@@ -170,12 +176,14 @@ final class ShippingBlockTest extends TestCase {
 		$service = $this->service();
 
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Providencia' ) );
+		self::taken_earlier();
 
 		$this->assertSame( '', self::printed( $service ), 'A commune not chosen.' );
 
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Penco', 'CL-BI' ) );
 		WP_Stub::$options['rcus_shipping_block_communes'] = array( 'Penco' );
 		$service = $this->service();
+		self::taken_earlier();
 
 		$this->assertSame( '', self::printed( $service ), 'A chosen commune whose zone never offered express: the message would only puzzle.' );
 
@@ -183,6 +191,7 @@ final class ShippingBlockTest extends TestCase {
 		WP_Stub::$zones[1]['methods'][1]->enabled = 'no';
 		WP_Stub::$options['rcus_shipping_block_communes'] = array( 'Paine' );
 		$service = $this->service();
+		self::taken_earlier();
 
 		$this->assertSame( '', self::printed( $service ), 'Express disabled in the zone: nothing to explain.' );
 
@@ -202,8 +211,265 @@ final class ShippingBlockTest extends TestCase {
 			0 => self::package( 'Providencia' ),
 			1 => self::package( 'Paine' ),
 		);
+		self::taken_earlier();
 
-		$this->assertSame( '<tr class="rcus-shipping-notice"><td colspan="2"><div class="woocommerce-info">' . self::DEFAULT_MESSAGE . '</div></td></tr>', self::printed( $this->service() ), 'A cart WooCommerce ships as two packages, the second to Paine.' );
+		$this->assertSame( self::NOTICE, self::printed( $this->service() ), 'A cart WooCommerce ships as two packages, the second to Paine.' );
+	}
+
+	/**
+	 * The message waits for the rule to take the rate the shopper had chosen: in the communes alone it reads as if there were no delivery at all.
+	 *
+	 * WooCommerce asks woocommerce_shipping_chosen_method for a package's
+	 * default rate whenever its chosen rate is gone or its rates changed, and
+	 * passes the rate that was chosen, or false before any was. Only a rate
+	 * the filter took in that same request, gone from that package's rates,
+	 * is a choice the rule took.
+	 *
+	 * @return void
+	 */
+	public function test_the_message_waits_for_the_rule_to_take_the_shoppers_choice(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+
+		$service = $this->service();
+		$rates   = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
+
+		$this->assertContains( array( 'woocommerce_shipping_chosen_method', Shipping_Block::class, 'note_taken_choice', 3 ), WP_Stub::$registered );
+		$this->assertSame( '', self::printed( $service ), 'Paine picked with no rate chosen yet: nothing says express is missing.' );
+
+		// WooCommerce's pick is the first rate left, or, since 8.8, a chosen pickup still offered.
+		$this->assertSame( 'flat_rate:5', $service->note_taken_choice( 'flat_rate:5', $rates, false ) );
+		$this->assertSame( 'flat_rate:5', $service->note_taken_choice( 'flat_rate:5', $rates, 'flat_rate:5' ) );
+		$this->assertSame( 'local_pickup:7', $service->note_taken_choice( 'local_pickup:7', $rates, 'local_pickup:7' ) );
+		$this->assertSame( 'flat_rate:5', $service->note_taken_choice( 'flat_rate:5', self::rates(), 'flat_rate:6' ) );
+
+		$this->assertSame( '', self::printed( $service ), 'No rate chosen before, standard delivery or pickup chosen, or express still offered to another package, outside the communes: the rule took no choice.' );
+
+		$fresh = $this->service();
+		$fresh->note_taken_choice( 'flat_rate:5', $rates, 'flat_rate:6' );
+
+		$this->assertSame( '', self::printed( $fresh ), 'Express gone with no filter of this request taking it: nothing says the rule did.' );
+
+		// What another plugin applying the filter could pass.
+		foreach ( array( array( 'flat_rate:5' ), array( '', 'not rates', 'flat_rate:6' ), array( null, $rates, array( 'flat_rate:6' ) ), array( 5, $rates, 6 ) ) as $args ) {
+			$this->assertSame( $args[0], $service->note_taken_choice( ...$args ), 'The rate WooCommerce picks comes back untouched.' );
+		}
+
+		$this->assertSame( '', self::printed( $service ), 'None of it names a rate the rule took.' );
+
+		$this->assertSame( 'flat_rate:5', $service->note_taken_choice( 'flat_rate:5', $rates, 'flat_rate:6' ), 'WooCommerce\'s pick stands.' );
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'Express was selected and the rule took it: the shopper is told why standard delivery took its place.' );
+	}
+
+	/**
+	 * What the rule took is kept in the session: the classic checkout draws its review again at every change of an address field.
+	 *
+	 * @return void
+	 */
+	public function test_the_taken_choice_outlives_the_request(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+
+		self::take_express( $this->service() );
+
+		$this->assertSame( self::version(), WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'Kept under the version the rates were worked out by.' );
+		$this->assertSame( self::NOTICE, self::printed( $this->service() ), 'The next request, whose filter took nothing: the review drawn again once the street is typed.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Ñuñoa' ) );
+
+		$this->assertSame( self::NOTICE, self::printed( $this->service() ), 'Another commune of the list: express is still not offered.' );
+	}
+
+	/**
+	 * The cart's shipping calculator unsets the chosen rate before it works the rates out: the rate chosen when the cart loaded stands in for it.
+	 *
+	 * WC_Shortcode_Cart::calculate_shipping() starts with
+	 * WC_Shipping::reset_shipping(), which unsets chosen_shipping_methods,
+	 * and fires woocommerce_calculated_shipping; the cart's totals then work
+	 * Paine's rates out, and WooCommerce, finding nothing chosen, passes false.
+	 *
+	 * @return void
+	 */
+	public function test_a_choice_the_cart_calculator_unset_still_counts(): void {
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine' ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6' );
+
+		// wp_loaded: the cart loads from the session, express selected on the cart page.
+		$service = $this->service();
+		$service->remember_chosen_rates();
+
+		$this->assertContains( array( 'woocommerce_cart_loaded_from_session', Shipping_Block::class, 'remember_chosen_rates', 1 ), WP_Stub::$registered );
+
+		// The calculator, sent with Paine.
+		unset( WP_Stub::$wc->session->data['chosen_shipping_methods'] );
+		do_action( 'woocommerce_calculated_shipping' );
+
+		$rates = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
+
+		$this->assertSame( 'flat_rate:5', $service->note_taken_choice( 'flat_rate:5', $rates, false ) );
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'Express selected on the cart, then Paine set in its calculator.' );
+	}
+
+	/**
+	 * Nothing chosen counts for nothing outside the calculator, and in it only a rate the rule took from the cart as it loaded counts.
+	 *
+	 * Elsewhere WooCommerce passes false for a package with no choice yet: a
+	 * new session, a package that just appeared, a cart session WooCommerce
+	 * cleared.
+	 *
+	 * @return void
+	 */
+	public function test_nothing_chosen_counts_only_after_the_calculator(): void {
+		WP_Stub::$wc->shipping()->packages                     = array( self::package( 'Paine' ) );
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6' );
+
+		$service = $this->service();
+		$service->remember_chosen_rates();
+		$service->note_taken_choice( 'flat_rate:5', $service->hide_rates( self::rates(), self::package( 'Paine' ) ), false );
+
+		$this->assertSame( '', self::printed( $service ), 'No calculator in this request.' );
+
+		do_action( 'woocommerce_calculated_shipping' );
+
+		foreach ( array( array( 'flat_rate:5', 7, array( 'flat_rate:6' ) ), 'flat_rate:6', null ) as $stored ) {
+			WP_Stub::$wc->session->data['chosen_shipping_methods'] = $stored;
+
+			$service = $this->service();
+			$service->remember_chosen_rates();
+			$service->note_taken_choice( 'flat_rate:5', $service->hide_rates( self::rates(), self::package( 'Paine' ) ), false );
+
+			$this->assertSame( '', self::printed( $service ), sprintf( 'The cart loaded with %s: no rate the rule took.', wp_json_encode( $stored ) ) );
+		}
+
+		// Express chosen for a second package whose lines were removed: the session keeps its choice.
+		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:5', 'flat_rate:6' );
+
+		$service = $this->service();
+		$service->remember_chosen_rates();
+		$service->note_taken_choice( 'flat_rate:5', $service->hide_rates( self::rates(), self::package( 'Paine' ) ), false );
+
+		$this->assertSame( '', self::printed( $service ), 'The one package the cart ships had standard delivery.' );
+	}
+
+	/**
+	 * It goes once the cart has nothing to ship: emptied as the order is placed, or its last line removed or dropped.
+	 *
+	 * empty_cart() fires woocommerce_cart_emptied; a line removed or dropped
+	 * reaches woocommerce_cart_updated, which WooCommerce fires each time it
+	 * stores the cart.
+	 *
+	 * @return void
+	 */
+	public function test_the_taken_choice_goes_once_the_cart_has_nothing_to_ship(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+		WP_Stub::$wc->cart                 = new WC_Cart();
+		WP_Stub::$wc->cart->fill( false, true );
+
+		$service = $this->service();
+		self::take_express( $service );
+
+		$this->assertContains( array( 'woocommerce_cart_emptied', Shipping_Block::class, 'forget_taken_choice', 1 ), WP_Stub::$registered );
+		$this->assertContains( array( 'woocommerce_cart_updated', Shipping_Block::class, 'forget_taken_choice', 1 ), WP_Stub::$registered );
+
+		$service->forget_taken_choice();
+
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'A line that ships is left: the same cart.' );
+
+		WP_Stub::$wc->cart->fill( true );
+		$service->forget_taken_choice();
+
+		$this->assertNull( WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'Only a virtual line left: nothing ships.' );
+
+		self::take_express( $service );
+		WP_Stub::$wc->cart->fill();
+		$service->forget_taken_choice();
+
+		$this->assertNull( WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'The last line removed, or the cart emptied by the order.' );
+		$this->assertSame( '', self::printed( $service ), 'The next cart to Paine was only ever offered standard delivery.' );
+
+		self::take_express( $service );
+		WP_Stub::$wc->cart = null;
+		$service->forget_taken_choice();
+
+		$this->assertNull( WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'No cart at all.' );
+	}
+
+	/**
+	 * Every save of the screen drops it, as it drops every stored rate: the rule switched off and on, its lists changed or its message filled in since.
+	 *
+	 * @return void
+	 */
+	public function test_a_save_of_the_screen_drops_the_taken_choice(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+		WP_Stub::$transients['shipping-transient-version'] = '1.000000';
+
+		self::take_express( $this->service() );
+
+		$this->assertSame( self::NOTICE, self::printed( $this->service() ) );
+
+		// The save: Shipping_Communes::refresh_rates() on rhinnoit_settings_saved.
+		Shipping_Communes::refresh_rates();
+
+		$this->assertSame( '', self::printed( $this->service() ), 'Taken under the version before the save.' );
+
+		$service = $this->service();
+		self::take_express( $service );
+
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'Taken again after it.' );
+	}
+
+	/**
+	 * It goes once the shipping options are drawn for an address out of the communes: back in them, only a choice taken again counts.
+	 *
+	 * @return void
+	 */
+	public function test_the_taken_choice_goes_once_the_address_leaves_the_communes(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+
+		$service = $this->service();
+		self::take_express( $service );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Penco', 'CL-BI' ) );
+		WP_Stub::$options['rcus_shipping_block_communes'] = array( 'Paine', 'Penco' );
+		$service = $this->service();
+
+		$this->assertSame( '', self::printed( $service ), 'A commune of the list whose zone never offered express: nothing to explain.' );
+		$this->assertSame( self::version(), WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'Still in the communes: nothing forgotten.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Providencia' ) );
+
+		$this->assertSame( '', self::printed( $service ), 'Providencia offers express again.' );
+		$this->assertNull( WP_Stub::$wc->session->get( Shipping_Block::TAKEN_CHOICE ), 'The address left the communes.' );
+
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+
+		$this->assertSame( '', self::printed( $service ), 'Back in Paine with standard delivery selected in Providencia: the rule took nothing this time.' );
+
+		self::take_express( $service );
+
+		$this->assertSame( self::NOTICE, self::printed( $service ), 'Express selected in Providencia, and taken again in Paine.' );
+	}
+
+	/**
+	 * Only the current shipping version in the session counts, and a request without a session neither prints nor fails.
+	 *
+	 * @return void
+	 */
+	public function test_the_session_is_read_with_care(): void {
+		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
+		WP_Stub::$transients['shipping-transient-version'] = '2.000000';
+
+		foreach ( array( '1.000000', '', true, 'yes', 1, 2.0, array( '2.000000' ), new stdClass() ) as $stored ) {
+			WP_Stub::$wc->session->data[ Shipping_Block::TAKEN_CHOICE ] = $stored;
+
+			$this->assertSame( '', self::printed( $this->service() ), sprintf( 'A %s in the session is no answer.', get_debug_type( $stored ) ) );
+		}
+
+		WP_Stub::$wc->session = null;
+
+		$service = $this->service();
+		self::take_express( $service );
+		$service->forget_taken_choice();
+
+		$this->assertSame( '', self::printed( $service ), 'No session: nothing kept, nothing printed.' );
 	}
 
 	/**
@@ -214,6 +480,7 @@ final class ShippingBlockTest extends TestCase {
 	public function test_the_message_is_escaped_and_an_empty_one_prints_nothing(): void {
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine' ) );
 		WP_Stub::$options['rcus_shipping_block_message'] = "Sin express en <script>alert(1)</script>.\nEscríbenos.";
+		self::taken_earlier();
 
 		$html = self::printed( $this->service() );
 
@@ -239,7 +506,10 @@ final class ShippingBlockTest extends TestCase {
 		$service = $this->service();
 
 		// init: the plugin loads its translations.
-		WP_Stub::$translations = array( self::DEFAULT_MESSAGE => 'El despacho express no está disponible para tu comuna. Por favor, elige otro método de envío.' );
+		WP_Stub::$translations = array( self::DEFAULT_MESSAGE => 'El despacho express no está disponible para tu comuna.' );
+
+		// The cart calculates its shipping: the rule takes the shopper's express.
+		self::take_express( $service );
 
 		$this->assertStringContainsString( 'El despacho express no está disponible', self::printed( $service ), 'Read in register(), a message never saved prints in English on every shop.' );
 	}
@@ -498,11 +768,13 @@ final class ShippingBlockTest extends TestCase {
 		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6' );
 
 		$service = $this->service();
-		$rates   = $service->hide_rates( self::rates(), self::package( 'Paine' ) );
-		self::printed( $service );
+		$rates   = self::take_express( $service );
+
+		$this->assertNotSame( '', self::printed( $service ) );
+
 		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
 
-		$this->assertSame( 0, WP_Stub::$method_lookups, 'The rates, the message and a stored rate chosen.' );
+		$this->assertSame( 0, WP_Stub::$method_lookups, 'The rates, the choice they took, the message and a stored rate chosen.' );
 
 		// The submit's own request, whose filter took express.
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', $rates ) );
@@ -666,8 +938,10 @@ final class ShippingBlockTest extends TestCase {
 		WP_Stub::$wc->session->data['chosen_shipping_methods'] = array( 'flat_rate:6' );
 
 		$service = $this->service();
-		$service->hide_rates( self::rates(), self::package( 'Paine' ) );
-		self::printed( $service );
+		self::take_express( $service );
+
+		$this->assertNotSame( '', self::printed( $service ), 'The message row asks for the one zone its package matches.' );
+
 		$service->refuse_hidden_method( self::posted( 'flat_rate:6' ), new WP_Error() );
 
 		WP_Stub::$wc->shipping()->packages = array( self::package( 'Paine', 'CL-RM', self::only( 'flat_rate:5' ) ) );
@@ -704,6 +978,46 @@ final class ShippingBlockTest extends TestCase {
 		$service->print_notice();
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Has the rule take the shopper's express, as WooCommerce goes about it: the rates worked out for the package, then its default asked for.
+	 *
+	 * The filter takes express from the package's rates. WooCommerce finds
+	 * the chosen rate gone and asks woocommerce_shipping_chosen_method for
+	 * the package's default with what wc_get_default_shipping_method_for_package()
+	 * passes on the classic cart and checkout: the first rate left, the
+	 * package's rates and the rate that was chosen.
+	 *
+	 * @param Shipping_Block $service The service.
+	 * @param string         $city    The city the package ships to.
+	 * @return array<string, WC_Shipping_Rate> The rates left.
+	 */
+	private static function take_express( Shipping_Block $service, string $city = 'Paine' ): array {
+		$rates = $service->hide_rates( self::rates(), self::package( $city ) );
+		$rates = is_array( $rates ) ? $rates : array();
+
+		$service->note_taken_choice( (string) array_key_first( $rates ), $rates, 'flat_rate:6' );
+
+		return $rates;
+	}
+
+	/**
+	 * Leaves in the session what an earlier request kept: that the rule took the shopper's choice, under the current shipping version.
+	 *
+	 * @return void
+	 */
+	private static function taken_earlier(): void {
+		WP_Stub::$wc->session->data[ Shipping_Block::TAKEN_CHOICE ] = self::version();
+	}
+
+	/**
+	 * The shipping version WooCommerce keys the stored rates by.
+	 *
+	 * @return string
+	 */
+	private static function version(): string {
+		return WC_Cache_Helper::get_transient_version( 'shipping' );
 	}
 
 	/**

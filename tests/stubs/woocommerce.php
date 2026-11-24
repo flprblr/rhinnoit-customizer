@@ -306,6 +306,21 @@ class WC_Cart {
 	public function display_prices_including_tax(): bool {
 		return $this->incl_tax;
 	}
+
+	/**
+	 * Whether a line ships, as WC_Cart::needs_shipping() answers with shipping on: one product that is not virtual.
+	 *
+	 * @return bool
+	 */
+	public function needs_shipping(): bool {
+		foreach ( $this->items as $item ) {
+			if ( ( $item['data'] ?? null ) instanceof WC_Product && ! $item['data']->is_virtual() ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
 
 /**

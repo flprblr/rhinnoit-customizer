@@ -599,6 +599,23 @@ The four features of this plugin's own live by these rules:
   and a method outside every zone builds the same shape with a number of its
   own, as `pickup_location:N` does with a location), or one `hide_rates()`
   took in this request, for ids of another shape.
+- **Hide shipping methods**' message is only for a shopper whose choice the
+  rule took (owner's decision, 2026-11-23: shown to everyone in the communes,
+  it reads as if there were no delivery at all, and the sale is lost). It is
+  read from `woocommerce_shipping_chosen_method`, which WooCommerce asks for
+  another rate when a package's chosen one is gone, passing the rate that was
+  chosen - false after the cart calculator's `reset_shipping()`, where the
+  rates chosen when the cart loaded stand in: it counts when `hide_rates()`
+  took that very id in the same request. The filter only watches, and hands
+  WooCommerce's pick back untouched. The answer lives in the WooCommerce
+  session (`Shipping_Block::TAKEN_CHOICE`), because the classic checkout
+  redraws its review at every address change, as the shipping version it was
+  read under, so every save of the screen drops it - as does anything else
+  that renews that version, failing towards silence; it also goes once the
+  cart has nothing to ship (`woocommerce_cart_emptied`,
+  `woocommerce_cart_updated`) or when shipping options are drawn with no
+  package in the communes. **Stop deliveries**' message is not gated: it is
+  the only word on why delivery went.
 - Choices that live in the database - today every zone's shipping methods,
   `Shipping_Block::method_choices()` - are built only when the screen draws or
   saves: they come from a field's `'options_callback'`, which only
@@ -632,7 +649,10 @@ The four features of this plugin's own live by these rules:
   submit check. The block checkout draws its own fields and runs none of their
   hooks, so there they do nothing and break nothing, and
   `cart_checkout_blocks` stays declared compatible. The rules' rates go on
-  both, since `woocommerce_package_rates` serves both.
+  both, since `woocommerce_package_rates` serves both, and so does Hide
+  shipping methods' record of a taken choice, since WooCommerce asks
+  `woocommerce_shipping_chosen_method` on both: only the classic cart and
+  checkout print the message.
 
 ## WP Optimizer
 

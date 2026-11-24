@@ -438,6 +438,8 @@ function check_admin_referer( $action ) {
 }
 function wp_die( $message ) { throw new WP_Halt( $message ); }
 function do_action( $hook, ...$args ) { WP_Stub::$fired[] = array_merge( array( $hook ), $args ); }
+// How many times do_action() fired the hook, as core counts it.
+function did_action( $hook ) { return count( array_filter( WP_Stub::$fired, static fn ( $fired ) => $hook === $fired[0] ) ); }
 function wp_send_json( $data ) { WP_Stub::$json_sent = $data; throw new WP_Halt( 'json' ); }
 function wp_safe_redirect( $url ) { WP_Stub::$redirect = $url; throw new WP_Halt( 'redirect' ); }
 // WC_Discounts asks it of every coupon it applies.

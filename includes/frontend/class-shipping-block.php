@@ -20,17 +20,29 @@ defined( 'ABSPATH' ) || exit;
  * nothing and the same kind of method in another zone stays.
  *
  * The rates go on woocommerce_package_rates, last, after the couriers'
- * plugins add theirs: the cart and both checkouts lose them. While a package
+ * plugins add theirs: the cart and both checkouts lose them. The message is
+ * for the shopper whose choice the rule took: once it took the rate they had
+ * selected and WooCommerce picked another in its place, and while a package
  * ships to one of the communes and its zone has one of the methods enabled,
- * the classic cart and checkout show the message as a row under the shipping
- * options; an empty message shows nothing, and the methods still go. The
- * rates WooCommerce stored before the rule changed can still hold a hidden
- * method the shopper chose, and a checkout drawn before can still post one
- * that is gone from the rates, so the classic checkout's submit refuses both.
+ * the classic cart and checkout show it as a row under the shipping options.
+ * A shopper who never had one of the methods selected sees nothing: in the
+ * communes alone the message reads as if there were no delivery at all. An
+ * empty message shows nothing, and the methods still go. The rates
+ * WooCommerce stored before the rule changed can still hold a hidden method
+ * the shopper chose, and a checkout drawn before can still post one that is
+ * gone from the rates, so the classic checkout's submit refuses both.
  *
  * Inert until both lists hold something.
  */
 final class Shipping_Block {
+
+	/**
+	 * Session key under which the shopper's session keeps that the rule took the rate they had chosen: see note_taken_choice().
+	 *
+	 * It holds the shipping version WooCommerce keyed the rates by when the
+	 * rule took the choice, and counts only while that version is current.
+	 */
+	const string TAKEN_CHOICE = 'rcus_shipping_block_taken_choice';
 
 	/**
 	 * Instance ids of the methods to hide.
@@ -54,11 +66,18 @@ final class Shipping_Block {
 	private ?string $message = null;
 
 	/**
-	 * Rate ids hide_rates() took away in this request, for the submit: see takes().
+	 * Rate ids hide_rates() took away in this request, for the submit and the shopper's choice: see takes() and note_taken_choice().
 	 *
 	 * @var array<string, bool>
 	 */
 	private array $taken = array();
+
+	/**
+	 * The rates the session held as chosen when the cart loaded, by package index: see remember_chosen_rates().
+	 *
+	 * @var array<int|string, string>
+	 */
+	private array $chosen_before = array();
 
 	/**
 	 * Hooks the save of the screen and any plugin's activation and deactivation, and the rule while it is on and both lists hold something.
@@ -88,6 +107,10 @@ final class Shipping_Block {
 
 		// Last, after the couriers' plugins add their rates.
 		add_filter( 'woocommerce_package_rates', array( $this, 'hide_rates' ), PHP_INT_MAX, 2 );
+		add_action( 'woocommerce_cart_loaded_from_session', array( $this, 'remember_chosen_rates' ) );
+		add_filter( 'woocommerce_shipping_chosen_method', array( $this, 'note_taken_choice' ), 10, 3 );
+		add_action( 'woocommerce_cart_updated', array( $this, 'forget_taken_choice' ) );
+		add_action( 'woocommerce_cart_emptied', array( $this, 'forget_taken_choice' ) );
 		add_action( 'woocommerce_cart_totals_after_shipping', array( $this, 'print_notice' ) );
 		add_action( 'woocommerce_review_order_after_shipping', array( $this, 'print_notice' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( $this, 'refuse_hidden_method' ), 10, 2 );
@@ -117,26 +140,129 @@ final class Shipping_Block {
 	}
 
 	/**
-	 * Prints the message under the shipping options, once, while a package's zone loses one of the methods.
+	 * Keeps the rates the session holds as chosen when the cart loads, before this request can wipe them.
+	 *
+	 * The classic cart's shipping calculator unsets every chosen rate
+	 * (WC_Shipping::reset_shipping()) before it works out the rates for the
+	 * address it was given, so WooCommerce then tells
+	 * woocommerce_shipping_chosen_method that nothing was chosen.
+	 * note_taken_choice() reads these instead, in that request.
+	 *
+	 * @return void
+	 */
+	public function remember_chosen_rates(): void {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$session     = $woocommerce instanceof \WooCommerce ? $woocommerce->session : null;
+		$chosen      = is_object( $session ) && method_exists( $session, 'get' ) ? $session->get( 'chosen_shipping_methods' ) : null;
+
+		$this->chosen_before = is_array( $chosen ) ? array_filter( $chosen, 'is_string' ) : array();
+	}
+
+	/**
+	 * Keeps in the shopper's session that the rule took the rate they had chosen, when WooCommerce picks another in its place.
+	 *
+	 * WooCommerce asks this filter for a package's default rate whenever the
+	 * chosen one is gone from its rates, or the rates changed, and passes the
+	 * rate that was chosen - selected by the shopper, or by WooCommerce as the
+	 * first rate - or false. False also comes after the cart's shipping
+	 * calculator unset the choice (woocommerce_calculated_shipping fired): the
+	 * rates chosen when the cart loaded, for the packages being rated, stand
+	 * in for it then. A rate counts only when hide_rates() took that very id
+	 * in this request and it is gone from this package's rates: then the rule
+	 * took the shopper's choice, which is what the message explains. Kept in
+	 * the session because the classic checkout draws its review again at
+	 * every change of an address field, and the message has to outlive that;
+	 * print_notice() and forget_taken_choice() say when it goes. WooCommerce
+	 * asks this on both checkouts, so the block checkout keeps the answer
+	 * too, though only the classic cart and checkout print the message.
+	 *
+	 * @param mixed $rate_id The rate WooCommerce picks in its place.
+	 * @param mixed $rates   The package's rates, rate id => WC_Shipping_Rate.
+	 * @param mixed $chosen  The rate that was chosen, or false.
+	 * @return mixed The rate WooCommerce picks, untouched.
+	 */
+	public function note_taken_choice( mixed $rate_id, mixed $rates = null, mixed $chosen = null ): mixed {
+		if ( is_string( $chosen ) ) {
+			$candidates = array( $chosen );
+		} elseif ( did_action( 'woocommerce_calculated_shipping' ) ) {
+			// Only the packages being rated now: the session keeps the choice of a package the cart no longer has.
+			$candidates = array_intersect_key( $this->chosen_before, Shipping_Communes::packages() );
+		} else {
+			$candidates = array();
+		}
+
+		foreach ( $candidates as $id ) {
+			if ( isset( $this->taken[ $id ] ) && is_array( $rates ) && ! isset( $rates[ $id ] ) ) {
+				self::keep_taken_choice( self::rates_version() );
+
+				break;
+			}
+		}
+
+		return $rate_id;
+	}
+
+	/**
+	 * Forgets that the rule took the shopper's choice once the cart has nothing to ship: emptied, its last line removed or dropped, the order placed.
+	 *
+	 * Hooked to woocommerce_cart_emptied, which empty_cart() fires when an
+	 * order is placed, and to woocommerce_cart_updated, which WooCommerce
+	 * fires each time it stores the cart: where it removes a line, and where
+	 * it drops one on loading the cart. WooCommerce 11 forgets its own chosen
+	 * rates there too once nothing in the cart ships.
+	 *
+	 * @return void
+	 */
+	public function forget_taken_choice(): void {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$session     = $woocommerce instanceof \WooCommerce ? $woocommerce->session : null;
+		$cart        = $woocommerce instanceof \WooCommerce ? $woocommerce->cart : null;
+
+		if ( ! is_object( $session ) || ! method_exists( $session, 'get' ) || null === $session->get( self::TAKEN_CHOICE ) ) {
+			return;
+		}
+
+		if ( ! $cart instanceof \WC_Cart || ! $cart->needs_shipping() ) {
+			self::keep_taken_choice( null );
+		}
+	}
+
+	/**
+	 * Prints the message under the shipping options, once, while the rule has taken the shopper's choice and a package's zone loses one of the methods.
 	 *
 	 * The zone is asked because a commune listed here can lie in a zone that
-	 * never offered the method: there the message would only puzzle.
+	 * never offered the method: there the message would only puzzle. Shipping
+	 * options drawn with no package in the communes mean the address left
+	 * them, so what the rule took there is forgotten: the message is for a
+	 * choice the rule takes from now on.
 	 *
 	 * @return void
 	 */
 	public function print_notice(): void {
 		$message = $this->message();
 
-		if ( '' === $message ) {
+		if ( '' === $message || ! self::taken_choice() ) {
 			return;
 		}
 
+		$in_communes = false;
+
 		foreach ( Shipping_Communes::packages() as $package ) {
-			if ( Shipping_Communes::matches( $package, $this->communes ) && $this->zone_offers_one( $package ) ) {
+			if ( ! Shipping_Communes::matches( $package, $this->communes ) ) {
+				continue;
+			}
+
+			if ( $this->zone_offers_one( $package ) ) {
 				Shipping_Communes::print_notice( $message );
 
 				return;
 			}
+
+			$in_communes = true;
+		}
+
+		if ( ! $in_communes ) {
+			self::keep_taken_choice( null );
 		}
 	}
 
@@ -325,6 +451,59 @@ final class Shipping_Block {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Whether the shopper's session keeps that the rule took the rate they had chosen, under the shipping version still current.
+	 *
+	 * Every save of the screen renews that version (Shipping_Communes::refresh_rates()),
+	 * so a choice taken before the rule was switched off and on, its lists
+	 * changed or its message filled in counts for nothing, like the rates it
+	 * was read from. Whatever else renews it drops the answer as well - a
+	 * save of another screen of the group, a plugin activated or deactivated,
+	 * a shipping zone saved, the version lost from the object cache - and
+	 * the message does not come back for that choice: it fails towards
+	 * silence. The session is read from the database: anything but the
+	 * current version is no answer.
+	 *
+	 * @return bool
+	 */
+	private static function taken_choice(): bool {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$session     = $woocommerce instanceof \WooCommerce ? $woocommerce->session : null;
+		$stored      = is_object( $session ) && method_exists( $session, 'get' ) ? $session->get( self::TAKEN_CHOICE ) : null;
+
+		return is_string( $stored ) && '' !== $stored && self::rates_version() === $stored;
+	}
+
+	/**
+	 * Writes into the shopper's session the shipping version the rule took their choice under, or forgets it with null.
+	 *
+	 * @param string|null $version The current shipping version, or null to forget.
+	 * @return void
+	 */
+	private static function keep_taken_choice( ?string $version ): void {
+		$woocommerce = function_exists( 'WC' ) ? WC() : null;
+		$session     = $woocommerce instanceof \WooCommerce ? $woocommerce->session : null;
+
+		if ( is_object( $session ) && method_exists( $session, 'set' ) ) {
+			$session->set( self::TAKEN_CHOICE, '' === $version ? null : $version );
+		}
+	}
+
+	/**
+	 * The version WooCommerce keys every shopper's stored rates by: '' without its cache helper.
+	 *
+	 * @return string
+	 */
+	private static function rates_version(): string {
+		if ( ! class_exists( \WC_Cache_Helper::class ) ) {
+			return '';
+		}
+
+		$version = \WC_Cache_Helper::get_transient_version( 'shipping' );
+
+		return is_scalar( $version ) ? (string) $version : '';
 	}
 
 	/**

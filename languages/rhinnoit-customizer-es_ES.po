@@ -143,8 +143,8 @@ msgid "Hide shipping methods in some communes"
 msgstr "Ocultar métodos de envío en algunas comunas"
 
 #: includes/class-settings.php
-msgid "For an address in the communes below, the shipping methods below are not offered, and the cart and the classic checkout show the message. Check both."
-msgstr "En una dirección de las comunas de abajo no se ofrecen los métodos de envío de abajo, y el carrito y la página de pago clásica muestran el mensaje. Revisa ambos."
+msgid "For an address in the communes below, the shipping methods below are not offered, and a shopper who had one of them selected sees the message in the cart and the classic checkout. Check both."
+msgstr "En una dirección de las comunas de abajo no se ofrecen los métodos de envío de abajo, y el cliente que tenía uno de ellos seleccionado ve el mensaje en el carrito y en la página de pago clásica. Revisa ambos."
 
 #: includes/class-settings.php
 msgid "Shipping methods to hide"
@@ -175,12 +175,12 @@ msgid "Message for those communes"
 msgstr "Mensaje para esas comunas"
 
 #: includes/class-settings.php
-msgid "Shown with the shipping options; leave it empty to show nothing."
-msgstr "Se muestra junto a las opciones de envío; déjalo vacío para no mostrar nada."
+msgid "Shown with the shipping options to a shopper who had one of the methods selected; leave it empty to show nothing."
+msgstr "Se muestra junto a las opciones de envío al cliente que tenía seleccionado uno de los métodos; déjalo vacío para no mostrar nada."
 
 #: includes/class-settings.php
-msgid "Express delivery is not available for your commune. Please choose another shipping method."
-msgstr "El despacho express no está disponible para tu comuna. Por favor, elige otro método de envío."
+msgid "Express delivery is not available for your commune."
+msgstr "El despacho express no está disponible para tu comuna."
 
 #: includes/class-settings.php
 msgid "Deliveries by commune"
@@ -197,6 +197,10 @@ msgstr "En una dirección de las comunas de abajo solo se ofrece el retiro en ti
 #: includes/class-settings.php
 msgid "Communes without delivery"
 msgstr "Comunas sin despacho"
+
+#: includes/class-settings.php
+msgid "Shown with the shipping options; leave it empty to show nothing."
+msgstr "Se muestra junto a las opciones de envío; déjalo vacío para no mostrar nada."
 
 #: includes/class-settings.php
 msgid "We cannot deliver to your commune for the time being. Please check your address, or contact us if you need help."

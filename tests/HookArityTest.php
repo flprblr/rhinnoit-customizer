@@ -93,10 +93,10 @@ final class HookArityTest extends TestCase {
 			$this->assertArrayHasKey( 'RhinnoIT\\Customizer\\Frontend\\' . $conditional, $classes, sprintf( '%s hooked nothing, so its callbacks went unchecked.', $conditional ) );
 		}
 
-		// The listed services hook fifty-four methods: Assets 1,
+		// The listed services hook fifty-eight methods: Assets 1,
 		// Widget_Thumbnail 2, Widget_Sale_Price 1, Birthdate_Style 1,
 		// Express_Checkout 2, Checkout_Focus 1, Commune_Select 1,
-		// Rut_Validation 4, Cart_Sale_Price 3, Coupon_Split 1, Shipping_Block 7,
+		// Rut_Validation 4, Cart_Sale_Price 3, Coupon_Split 1, Shipping_Block 11,
 		// Shipping_Exclusion 9, Inventory_Links 2, Quick_View_Store 1,
 		// Size_Stores 2, Store_Choice 4, Pickup_Stores 1, Store_Stock_Hold 4,
 		// Unpaid_Orders 1, Fintoc_Session_Expiry 1, Menu 3, Settings_Page 1
@@ -106,6 +106,6 @@ final class HookArityTest extends TestCase {
 		// plugin: checked like the rest, by the class the hook names. Fewer
 		// means the list above lost a service; raise it with every service
 		// added, lower it with one removed.
-		$this->assertGreaterThanOrEqual( 54, $checked, 'Most hooks went unchecked, so this case proves little.' );
+		$this->assertGreaterThanOrEqual( 58, $checked, 'Most hooks went unchecked, so this case proves little.' );
 	}
 }
